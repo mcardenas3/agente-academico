@@ -1,0 +1,6 @@
+# Notas y documentos de trabajo: se quedan solo en la computadora
+*.md
+!README.md
+
+# Secretos: tokens de Hugging Face y ngrok, contraseñas de bases de datos
+.env

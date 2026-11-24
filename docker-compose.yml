@@ -1,0 +1,56 @@
+services:
+  # ---------- Base de datos principal ----------
+  postgres:
+    image: postgres:17                          # Imagen oficial de PostgreSQL, versión 17
+    environment:                                # Con esto Postgres crea usuario y base al arrancar por primera vez
+      POSTGRES_USER: ${POSTGRES_USER}           # Usuario administrador
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # Su contraseña
+      POSTGRES_DB: ${POSTGRES_DB}               # Base de datos que se crea automáticamente
+    ports:
+      - "127.0.0.1:5432:5432"                   # "IP_local:puerto_tu_PC:puerto_contenedor"; 127.0.0.1 = solo accesible desde tu máquina, no desde la red
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Guarda los datos fuera del contenedor para que no se pierdan al reiniciarlo
+    healthcheck:                                # Revisión periódica para saber si Postgres ya acepta conexiones
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]  # Comando que responde "listo" o "no listo"
+      interval: 5s                              # Cada cuánto se ejecuta la revisión
+      timeout: 3s                               # Cuánto espera la respuesta antes de darla por fallida
+      retries: 10                               # Fallos seguidos permitidos antes de marcarlo "unhealthy"
+
+  # ---------- Redis: almacenamiento en memoria (caché, colas, sesiones) ----------
+  redis:
+    image: redis:7                              # Imagen oficial de Redis, versión 7
+    ports:
+      - "127.0.0.1:6379:6379"                   # Puerto estándar de Redis, también solo local
+    volumes:
+      - redis_data:/data                        # Carpeta donde Redis guarda sus respaldos en disco
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]        # Si Redis está bien, responde "PONG"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- OpenSearch: buscador (por palabras y por significado) ----------
+  opensearch:
+    image: opensearchproject/opensearch:3.9.0   # Versión fija: así todos corremos exactamente lo mismo
+    environment:
+      discovery.type: single-node               # Un solo servidor: no busca otros para formar un grupo (clúster)
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m" # Memoria mínima y máxima que puede usar; 512 MB basta para un artículo
+      DISABLE_SECURITY_PLUGIN: "true"           # Sin usuario/contraseña ni HTTPS; aceptable porque solo es accesible localmente
+      DISABLE_INSTALL_DEMO_CONFIG: "true"       # No instala los certificados de demostración (no se usan sin seguridad)
+    ports:
+      - "127.0.0.1:9200:9200"                   # Puerto donde OpenSearch recibe peticiones, también solo local
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data  # Aquí viven los índices (los fragmentos del artículo)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]  # Pregunta por el estado del servidor
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s                         # Tiempo de gracia: OpenSearch tarda en arrancar y esos fallos no cuentan
+
+# Volúmenes con nombre: Docker los administra y sobreviven a "docker compose down"
+# (solo se borran con "docker compose down -v").
+volumes:
+  postgres_data:
+  redis_data:
+  opensearch_data:
