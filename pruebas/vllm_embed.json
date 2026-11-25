@@ -1,0 +1,6 @@
+{
+  "model": "nvidia/Nemotron-3-Embed-1B-BF16",
+  "input_type": "query",
+  "texts": ["¿Qué es la búsqueda híbrida?"],
+  "embedding_types": ["float"]
+}

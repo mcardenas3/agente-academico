@@ -48,9 +48,63 @@ services:
       retries: 12
       start_period: 60s                         # Tiempo de gracia: OpenSearch tarda en arrancar y esos fallos no cuentan
 
+  # ---------- Ollama: servidor del modelo de lenguaje (el que redacta las respuestas) ----------
+  ollama:
+    image: ollama/ollama:0.40.17                # Versión fija de Ollama, el programa que carga el modelo y lo atiende por HTTP
+    environment:
+      OLLAMA_CONTEXT_LENGTH: "8192"             # Cuánto texto cabe en una sola petición, medido en tokens (pedazos de palabra): pregunta + historial + fragmentos
+      OLLAMA_KEEP_ALIVE: "-1"                   # Mantiene el modelo cargado en la tarjeta de video; por default lo saca tras 5 min sin uso y recargarlo tarda mucho
+    ports:
+      - "127.0.0.1:11434:11434"                 # Puerto estándar de Ollama, también solo local
+    volumes:
+      - ollama_data:/root/.ollama               # Aquí quedan los modelos descargados (pesan varios GB) para no bajarlos otra vez
+    deploy:                                     # Recursos de hardware que se le asignan al contenedor
+      resources:
+        reservations:                           # "Reservar": lo que el contenedor necesita para poder arrancar
+          devices:
+            - driver: nvidia                    # Usa el controlador de NVIDIA
+              count: all                        # Todas las tarjetas de video disponibles (aquí solo hay una)
+              capabilities: [gpu]               # Pide acceso a la tarjeta; equivale al "--gpus all" de "docker run"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]           # Lista los modelos descargados; solo responde si el servidor ya está arriba
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s                         # Tiempo de gracia mientras arranca y detecta la tarjeta de video
+
+  # ---------- vLLM: servidor del modelo de embeddings (convierte texto en vectores para poder buscar por significado) ----------
+  vllm:
+    image: vllm/vllm-openai:v0.25.0             # Versión fija de vLLM; es la que indica la ficha del modelo de embeddings
+    command:                                    # Opciones con las que arranca vLLM (cada opción va seguida de su valor)
+      - nvidia/Nemotron-3-Embed-1B-BF16         # Primero va el modelo que va a atender; la primera vez lo descarga de Hugging Face (2.3 GB)
+      - --gpu-memory-utilization                # Fracción de la memoria de la tarjeta de video que puede tomar vLLM...
+      - "0.45"                                  # ...45 % (unos 3.6 GB); sin este tope intenta tomar casi toda y choca con Ollama
+      - --max-model-len                         # Largo máximo de un texto de entrada, en tokens...
+      - "8192"                                  # ...8192 en vez de los 32768 que admite el modelo; sobra para un fragmento y ahorra memoria
+    ports:
+      - "127.0.0.1:8000:8000"                   # Puerto estándar de vLLM, también solo local
+    volumes:
+      - hf_cache:/root/.cache/huggingface       # Carpeta donde Hugging Face guarda lo descargado; así el modelo se baja una sola vez
+    ipc: host                                   # Deja usar la memoria compartida del sistema; la necesita PyTorch, la librería con la que vLLM corre el modelo
+    deploy:                                     # Mismo bloque que en Ollama: le presta la tarjeta de video al contenedor
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]  # Pide la página /health; da error mientras el modelo no termina de cargar
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 300s                        # Tiempo de gracia largo: la primera vez descarga el modelo antes de cargarlo
+
 # Volúmenes con nombre: Docker los administra y sobreviven a "docker compose down"
 # (solo se borran con "docker compose down -v").
 volumes:
   postgres_data:
   redis_data:
   opensearch_data:
+  ollama_data:
+  hf_cache:
