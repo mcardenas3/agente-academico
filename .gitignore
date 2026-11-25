@@ -4,3 +4,12 @@
 
 # Secretos: tokens de Hugging Face y ngrok, contraseñas de bases de datos
 .env
+
+# Entornos virtuales de Python: cada quien los recrea con "uv sync"
+.venv/
+
+# Archivos compilados que Python genera solo al ejecutar el código
+__pycache__/
+
+# Lo que produce Docling: se regenera corriendo ingesta/convertir.py
+datos/procesado/

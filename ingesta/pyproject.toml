@@ -1,0 +1,12 @@
+# Ficha del proyecto de ingesta: convierte el PDF en fragmentos y los indexa en OpenSearch
+[project]
+# Nombre del proyecto
+name = "ingesta"
+# Versión del proyecto
+version = "0.1.0"
+# Solo Python 3.13: con 3.15 faltan paquetes ya compilados para Windows (pyclipper, tree-sitter)
+requires-python = "==3.13.*"
+# Librerías que necesita el proyecto; se agregan con "uv add"
+dependencies = [
+    "docling>=2.152.0",
+]
