@@ -562,12 +562,14 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "docling" },
+    { name = "httpx" },
     { name = "opensearch-py" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "docling", specifier = ">=2.152.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "opensearch-py", specifier = ">=3.2.0" },
 ]
 

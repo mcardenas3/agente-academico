@@ -9,5 +9,6 @@ requires-python = "==3.13.*"
 # Librerías que necesita el proyecto; se agregan con "uv add"
 dependencies = [
     "docling>=2.152.0",
+    "httpx>=0.28.1",
     "opensearch-py>=3.2.0",
 ]
