@@ -112,6 +112,18 @@ def buscar_fragmentos(cliente: OpenSearch, pregunta: str, pregunta_en: str) -> l
     return buscar_con_vector(cliente, pregunta_en, vectorizar(pregunta))
 
 
+def traer_fragmentos(cliente: OpenSearch, ids: list[str]) -> list[Fragmento]:
+    """Los fragmentos con esos ids, en el mismo orden; los que no existen se omiten.
+
+    Sirve para mostrar en la interfaz el texto exacto en que se basó una respuesta. El texto se
+    lee del índice y no se copia a PostgreSQL: allá cada cita guarda solo el id del fragmento.
+    """
+    if not ids:
+        return []
+    documentos = cliente.mget(index=INDICE, body={"ids": ids}, _source=CAMPOS)["docs"]
+    return [Fragmento(**d["_source"]) for d in documentos if d.get("found")]
+
+
 # --- Fichas de la bibliografía ---
 
 # Cuántas fichas se pueden pedir de una vez: alcanza para citas como "[48, 82, 101]" y evita que

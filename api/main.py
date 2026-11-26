@@ -4,6 +4,7 @@ Rutas:
     POST /api/chat                     pregunta → eventos SSE ("conversacion", "buscando",
                                        "respuesta" o "error")
     GET  /api/conversaciones/{id}      mensajes de una conversación, para volver a pintarla
+    GET  /api/fragmentos?ids=…         texto exacto de los fragmentos citados (hasta 10)
     GET  /articulo.pdf                 el artículo; las citas lo abren en su página (#page=N)
     GET  /api/salud                    estado de cada servicio
     GET  /api/admin/resumen            totales y promedios          ┐
@@ -18,6 +19,7 @@ Correr en desarrollo (desde api/, con los servicios encendidos):
 import asyncio
 import logging
 import os
+import re
 import secrets
 import time
 import uuid
@@ -38,7 +40,10 @@ from agente import (
     MODELO_LLM, URL_OLLAMA, RespuestaCitada, Turno, TURNOS_DE_MEMORIA, crear_cliente,
     preguntar_por_eventos,
 )
-from busqueda import INDICE, URL_EMBED, URL_OPENSEARCH, vectorizar
+from busqueda import INDICE, URL_EMBED, URL_OPENSEARCH, Fragmento, traer_fragmentos, vectorizar
+
+# Forma de los ids de fragmento del índice
+ID_FRAGMENTO = re.compile(r"huang2026-rag-survey-\d{3}")
 
 registro = logging.getLogger("agente")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -152,6 +157,14 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
 @app.get("/api/conversaciones/{conversacion_id}")
 async def conversacion(conversacion_id: uuid.UUID, request: Request) -> list[dict]:
     return await bd.mensajes_de(request.app.state.grupo, conversacion_id)
+
+
+@app.get("/api/fragmentos")
+async def fragmentos(request: Request, ids: list[str] = Query(max_length=10)) -> list[Fragmento]:
+    """El texto exacto de los fragmentos citados, para mostrarlo debajo de la respuesta."""
+    # Solo ids con la forma de los del índice, p. ej. huang2026-rag-survey-034
+    validos = [i for i in ids if ID_FRAGMENTO.fullmatch(i)]
+    return await asyncio.to_thread(traer_fragmentos, request.app.state.opensearch, validos)
 
 
 @app.get("/articulo.pdf", include_in_schema=False)

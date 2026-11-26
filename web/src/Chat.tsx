@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { cargarConversacion, preguntar, type Cita, type Respuesta } from './api'
+import { cargarConversacion, cargarFragmentos, preguntar, type Cita, type Fragmento, type Respuesta } from './api'
 import { paginas, numero, tiempo, ultimaSeccion } from './formato'
-import { ArrowClockwise, ArrowSquareOut, ArrowUp, Check, Lightning, MagnifyingGlass, NotePencil, Warning } from './iconos'
+import {
+  ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, MagnifyingGlass, NotePencil, Quotes, Warning,
+} from './iconos'
 
 type Mensaje =
   | { rol: 'usuario'; texto: string }
@@ -209,6 +211,7 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
           })}
         </div>
       )}
+      {m.citas.length > 0 && <TextoCitado citas={m.citas} />}
       {m.meta && (
         <div className="flex flex-wrap items-center gap-2 text-micro text-ink-faint">
           {fuera && <span className="chip" data-tone="warn">Fuera del artículo</span>}
@@ -217,6 +220,58 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
           ) : (
             <span>{tiempo(m.meta.segundos)} · {numero(m.meta.tokens_entrada)} → {numero(m.meta.tokens_salida)} tokens</span>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Despliega el texto exacto de los fragmentos en que se basó la respuesta. Se pide al abrirlo. */
+function TextoCitado({ citas }: { citas: Cita[] }) {
+  const [abierto, setAbierto] = useState(false)
+  const [fragmentos, setFragmentos] = useState<Fragmento[] | null>(null)
+  const [error, setError] = useState(false)
+
+  function alternar() {
+    setAbierto((a) => !a)
+    if (!fragmentos) {
+      setError(false)
+      cargarFragmentos(citas.map((c) => c.id)).then(setFragmentos).catch(() => setError(true))
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={alternar} aria-expanded={abierto}
+        className="inline-flex items-center gap-1.5 text-micro font-semibold text-ink-muted hover:text-ink">
+        <Quotes size={13} weight="bold" />
+        {abierto ? 'Ocultar' : 'Ver'} el texto citado ({citas.length})
+        <CaretDown size={11} weight="bold" className={`transition-transform ${abierto ? 'rotate-180' : ''}`} />
+      </button>
+      {abierto && (
+        <div className="mt-2 flex flex-col gap-2">
+          {error && <p className="text-micro text-[var(--red-11)]">No se pudo cargar el texto citado.</p>}
+          {!fragmentos && !error && <p className="text-micro text-ink-faint">Cargando…</p>}
+          {fragmentos?.map((f) => {
+            // Las tablas vienen en Markdown: se muestran en monoespaciada y con scroll horizontal
+            const esTabla = /^\|/m.test(f.texto)
+            return (
+              <figure key={f.id} className="m-0 rounded-[10px] border border-line-subtle bg-raised">
+                <figcaption className="flex items-center gap-2 border-b border-line-subtle px-3 py-1.5 text-micro text-ink-muted">
+                  <span className="min-w-0 truncate" title={f.seccion}>{f.seccion}</span>
+                  <a className="ml-auto inline-flex shrink-0 items-center gap-1 font-semibold text-brand-ink hover:underline"
+                    href={`/articulo.pdf#page=${Math.min(...f.paginas)}`} target="_blank" rel="noopener">
+                    {paginas(f.paginas)} <ArrowSquareOut size={11} weight="bold" />
+                  </a>
+                </figcaption>
+                <blockquote className={`m-0 max-h-64 overflow-auto px-3 py-2 text-ink ${esTabla
+                  ? 'font-mono text-[11px] leading-snug whitespace-pre'
+                  : 'text-meta whitespace-pre-wrap'}`}>
+                  {f.texto}
+                </blockquote>
+              </figure>
+            )
+          })}
         </div>
       )}
     </div>

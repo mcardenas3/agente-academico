@@ -69,6 +69,16 @@ export async function preguntar(pregunta: string, conversacionId: string | null,
   if (!terminado) m.error('La conexión se cortó antes de terminar.')
 }
 
+export type Fragmento = { id: string; seccion: string; paginas: number[]; texto: string }
+
+/** El texto exacto de los fragmentos citados, en el mismo orden. */
+export async function cargarFragmentos(ids: string[]): Promise<Fragmento[]> {
+  const qs = new URLSearchParams(ids.map((id) => ['ids', id]))
+  const res = await fetch(`/api/fragmentos?${qs}`)
+  if (!res.ok) throw new Error(`Error ${res.status}`)
+  return res.json()
+}
+
 export async function cargarConversacion(id: string): Promise<MensajeGuardado[]> {
   const res = await fetch(`/api/conversaciones/${id}`)
   return res.ok ? res.json() : []
