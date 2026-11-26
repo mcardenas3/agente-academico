@@ -94,10 +94,13 @@ como `healthy` en `docker compose ps`, todo está listo.
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credenciales de PostgreSQL |
 | `ADMIN_TOKEN` | Token para entrar al panel `/admin` |
 | `NGROK_AUTHTOKEN` | Token de la cuenta de ngrok ([dónde sacarlo](https://dashboard.ngrok.com/get-started/your-authtoken)) |
+| `NGROK_URL` | Opcional: dominio fijo de la cuenta de ngrok (p. ej. `https://algo.ngrok-free.dev`); sin él, la URL cambia en cada arranque |
 
 - **Chat:** http://127.0.0.1:8080
 - **Panel:** http://127.0.0.1:8080/admin (pide el `ADMIN_TOKEN`)
-- **URL pública:** la muestra el panel de ngrok en http://127.0.0.1:4040
+- **URL pública:** la de `NGROK_URL`, o la que muestra el panel de ngrok en http://127.0.0.1:4040.
+  Con la cuenta gratuita, ngrok muestra a cada visitante un aviso la primera vez; se pasa con
+  **Visit Site**.
 
 Todos los puertos escuchan solo en `127.0.0.1`. Desde fuera se entra únicamente por ngrok.
 
