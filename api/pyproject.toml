@@ -9,10 +9,18 @@ version = "0.1.0"
 requires-python = "==3.13.*"
 # Librerías que necesita el proyecto; se agregan con "uv add"
 dependencies = [
+    # El servidor web: rutas /api/chat, /api/admin y la interfaz de React ya compilada
+    "fastapi>=0.165.0",
     # Cliente HTTP para pedir a vLLM el vector de la pregunta
     "httpx>=0.28.1",
     # Cliente de OpenSearch para la búsqueda híbrida
     "opensearch-py>=3.2.0",
+    # Cliente de PostgreSQL (conversaciones, mensajes y métricas), con grupo de conexiones
+    "psycopg[binary,pool]>=3.3.9",
     # Pydantic AI con el grupo "openai": Ollama se usa por su API compatible con OpenAI
     "pydantic-ai-slim[openai]>=2.75.0",
+    # Cliente de Redis (caché de respuestas e historial reciente)
+    "redis>=8.2.0",
+    # El programa que corre la aplicación de FastAPI
+    "uvicorn[standard]>=0.54.0",
 ]
