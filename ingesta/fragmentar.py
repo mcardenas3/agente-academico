@@ -9,6 +9,7 @@ artículo en el texto) salieron del experimento de probar_fragmentos.py.
 """
 
 import json
+import re
 import statistics
 
 from docling_core.transforms.chunker.hierarchical_chunker import (
@@ -38,8 +39,9 @@ MODELO_EMBEDDINGS = "nvidia/Nemotron-3-Embed-1B-BF16"
 MAX_TOKENS = 512
 # Identificador del artículo (DOI); se guarda en cada fragmento para poder citarlo
 DOI = "10.1145/3805774"
-# Título de la sección de referencias en el artículo
-SECCION_REFERENCIAS = "References"
+# Títulos con que suele empezar la bibliografía (con o sin número delante: "7 References")
+TITULOS_DE_REFERENCIAS = {"references", "bibliography", "referencias", "bibliografía",
+                          "works cited", "literature cited"}
 # Nombre para lo que va antes de la primera sección (autores, resumen, datos de publicación),
 # que en el PDF no tiene título
 SECCION_INICIAL = "Front matter"
@@ -50,6 +52,11 @@ class ProveedorMarkdown(ChunkingSerializerProvider):
 
     def get_serializer(self, doc: DoclingDocument) -> ChunkingDocSerializer:
         return ChunkingDocSerializer(doc=doc, table_serializer=MarkdownTableSerializer())
+
+
+def es_referencias(titulo: str) -> bool:
+    """Dice si un título es el de la bibliografía."""
+    return re.sub(r"^\d+(\.\d+)*\s+", "", titulo.strip()).lower() in TITULOS_DE_REFERENCIAS
 
 
 def crear_fragmento(texto: str, secciones: list[str], elementos: list, contexto: dict) -> dict:
@@ -71,7 +78,9 @@ def crear_fragmento(texto: str, secciones: list[str], elementos: list, contexto:
         "texto_para_buscar": texto_para_buscar,
         "tokens": contexto["tokenizador"].count_tokens(texto_para_buscar),
         "articulo": contexto["titulo"],
-        "doi": DOI,
+        # Con qué artículo de la biblioteca se filtra la búsqueda
+        "articulo_id": contexto["articulo_id"],
+        "doi": contexto["doi"],
     }
 
 
@@ -82,7 +91,7 @@ def fragmentos_de_contenido(doc: DoclingDocument, contexto: dict) -> list[dict]:
     fragmentos = []
     for pedazo in chunker.chunk(doc):
         secciones = pedazo.meta.headings or []
-        if secciones and secciones[-1] == SECCION_REFERENCIAS:
+        if secciones and es_referencias(secciones[-1]):
             # Las referencias se arman aparte, una por fragmento
             continue
         fragmento = crear_fragmento(pedazo.text, secciones, pedazo.meta.doc_items, contexto)
@@ -95,42 +104,56 @@ def fragmentos_de_contenido(doc: DoclingDocument, contexto: dict) -> list[dict]:
 def fragmentos_de_referencias(doc: DoclingDocument, contexto: dict) -> list[dict]:
     """Un fragmento por cada referencia de la bibliografía, con su número."""
     fragmentos = []
-    en_referencias = False
+    titulo_referencias = None  # el título tal como viene en el artículo, si se está dentro
     for elemento, _ in doc.iterate_items():
         if isinstance(elemento, SectionHeaderItem):
             # Se entra a la bibliografía al ver su título y se sale al ver cualquier otro
-            en_referencias = elemento.text == SECCION_REFERENCIAS
-        elif en_referencias and isinstance(elemento, ListItem):
-            # El número va en el marcador de la lista: "[48]"
-            texto = f"{elemento.marker} {elemento.text}"
-            fragmento = crear_fragmento(texto, [SECCION_REFERENCIAS], [elemento], contexto)
+            titulo_referencias = elemento.text if es_referencias(elemento.text) else None
+        elif titulo_referencias and isinstance(elemento, ListItem):
+            # El número va en el marcador de la lista: "[48]" o "48."; si no trae, se cuenta
+            numero = re.search(r"\d+", elemento.marker or "")
+            texto = f"{elemento.marker} {elemento.text}".strip()
+            fragmento = crear_fragmento(texto, [titulo_referencias], [elemento], contexto)
             fragmento["tipo"] = "referencia"
-            fragmento["numero_referencia"] = int(elemento.marker.strip("[]"))
+            fragmento["numero_referencia"] = int(numero.group()) if numero else len(fragmentos) + 1
             fragmentos.append(fragmento)
     return fragmentos
 
 
-def main() -> None:
+def crear_tokenizador() -> HuggingFaceTokenizer:
+    """El tokenizador del modelo de embeddings, para medir los fragmentos como él los mide."""
     # Oculta avisos de transformers sobre la configuración del modelo que no afectan al tokenizador
     registro_transformers.set_verbosity_error()
-    doc = DoclingDocument.load_from_json(ARTICULO_LIMPIO)
-    titulo_item = next(e for e, _ in doc.iterate_items() if isinstance(e, TitleItem))
-    titulo = titulo_item.text
-    # El chunker pondría el título del artículo como primer encabezado de todos los fragmentos
-    # (y le restaría ~15 tokens al espacio de cada uno). Con un solo artículo no distingue a un
-    # fragmento de otro, así que se quita del documento en memoria; se guarda en "articulo"
-    doc.delete_items(node_items=[titulo_item])
     base = AutoTokenizer.from_pretrained(MODELO_EMBEDDINGS)
-    # Datos que necesitan todas las funciones: el tokenizador para contar y el título del artículo
-    contexto = {
-        "tokenizador": HuggingFaceTokenizer(tokenizer=base, max_tokens=MAX_TOKENS),
-        "titulo": titulo,
-    }
+    return HuggingFaceTokenizer(tokenizer=base, max_tokens=MAX_TOKENS)
 
+
+def fragmentar_documento(doc: DoclingDocument, articulo_id: str, titulo: str, doi: str | None,
+                         tokenizador: HuggingFaceTokenizer) -> list[dict]:
+    """Parte un documento ya limpio en fragmentos de contenido y de bibliografía.
+
+    La usan este script (el survey original) y el trabajador que procesa los artículos subidos.
+    """
+    # El chunker pondría el título del artículo como primer encabezado de todos los fragmentos
+    # (y le restaría ~15 tokens al espacio de cada uno). No distingue a un fragmento de otro del
+    # mismo artículo, así que se quita del documento en memoria; se guarda en "articulo"
+    titulos = [e for e, _ in doc.iterate_items() if isinstance(e, TitleItem)]
+    if titulos:
+        doc.delete_items(node_items=titulos)
+    contexto = {"tokenizador": tokenizador, "titulo": titulo, "articulo_id": articulo_id,
+                "doi": doi}
     fragmentos = fragmentos_de_contenido(doc, contexto) + fragmentos_de_referencias(doc, contexto)
-    # Identificador fijo para cada fragmento: nombre del documento + número consecutivo
+    # Identificador fijo para cada fragmento: id del artículo + número consecutivo
     for numero, fragmento in enumerate(fragmentos, start=1):
-        fragmento["id"] = f"{doc.name}-{numero:03d}"
+        fragmento["id"] = f"{articulo_id}-{numero:03d}"
+    return fragmentos
+
+
+def main() -> None:
+    doc = DoclingDocument.load_from_json(ARTICULO_LIMPIO)
+    titulo = next(e for e, _ in doc.iterate_items() if isinstance(e, TitleItem)).text
+    # doc.name es el nombre del PDF sin extensión: "huang2026-rag-survey"
+    fragmentos = fragmentar_documento(doc, doc.name, titulo, DOI, crear_tokenizador())
 
     # JSONL: un objeto JSON por línea; ensure_ascii=False deja legibles las ✓ y los acentos
     with SALIDA.open("w", encoding="utf-8") as archivo:

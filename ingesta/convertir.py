@@ -20,8 +20,12 @@ PDF = RAIZ / "datos" / "huang2026-rag-survey.pdf"
 SALIDA = RAIZ / "datos" / "procesado"
 
 
-def crear_convertidor() -> DocumentConverter:
-    """Arma el convertidor de Docling con las opciones que necesita este PDF."""
+def crear_convertidor(imagenes: bool = True, hilos: int = 8) -> DocumentConverter:
+    """Arma el convertidor de Docling con las opciones que necesita este PDF.
+
+    Con imagenes=False no guarda la imagen de cada figura: es lo que usa el trabajador de los
+    artículos subidos, porque las imágenes no se usan para responder y ocupan RAM.
+    """
     opciones = PdfPipelineOptions()
     # El PDF es digital: el texto se lee directo y no hace falta OCR
     opciones.do_ocr = False
@@ -30,12 +34,12 @@ def crear_convertidor() -> DocumentConverter:
     # Modelo de tablas en modo preciso: más lento que FAST, pero mejor con tablas complejas
     opciones.table_structure_options.mode = TableFormerMode.ACCURATE
     # Guardar la imagen de cada figura, para revisarlas y para el modelo de visión más adelante
-    opciones.generate_picture_images = True
+    opciones.generate_picture_images = imagenes
     # Resolución de esas imágenes: 2 = el doble del tamaño original de la página
-    opciones.images_scale = 2.0
-    # Correr en CPU con 8 hilos, uno por núcleo físico del Ryzen 9 270
+    opciones.images_scale = 2.0 if imagenes else 1.0
+    # Correr en CPU; 8 hilos = uno por núcleo físico del Ryzen 9 270
     opciones.accelerator_options = AcceleratorOptions(
-        device=AcceleratorDevice.CPU, num_threads=8
+        device=AcceleratorDevice.CPU, num_threads=hilos
     )
     return DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opciones)}

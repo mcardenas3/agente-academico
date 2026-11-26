@@ -59,13 +59,13 @@ def revisar_vector(vector: list[float], id_fragmento: str) -> float:
     return largo
 
 
-def main() -> None:
-    with FRAGMENTOS.open(encoding="utf-8") as archivo:
-        fragmentos = [json.loads(linea) for linea in archivo]
-    cliente = OpenSearch(hosts=[URL_OPENSEARCH])
-    if not cliente.indices.exists(index=INDICE):
-        raise SystemExit(f"No existe el índice {INDICE}; primero: uv run python crear_indice.py")
+def indexar_fragmentos(cliente: OpenSearch, fragmentos: list[dict], avisar=print
+                       ) -> tuple[int, list[float], float]:
+    """Vectoriza los fragmentos con vLLM y los guarda en el índice. Devuelve cuántos guardó, el
+    largo de cada vector y los segundos que tardó la vectorización.
 
+    La usan este script (el survey original) y el trabajador de los artículos subidos.
+    """
     # 1. Vectorizar en lotes
     inicio = time.perf_counter()
     largos = []
@@ -78,13 +78,24 @@ def main() -> None:
             for fragmento, vector in zip(lote, vectores, strict=True):
                 largos.append(revisar_vector(vector, fragmento["id"]))
                 fragmento["vector"] = vector
-            print(f"  vectorizados {i + len(lote)} de {len(fragmentos)}")
+            avisar(f"  vectorizados {i + len(lote)} de {len(fragmentos)}")
     segundos = time.perf_counter() - inicio
 
     # 2. Guardar en OpenSearch: una acción por fragmento, con su id como _id del documento
     acciones = ({"_index": INDICE, "_id": f["id"], "_source": f} for f in fragmentos)
     # refresh=True: los documentos se pueden buscar en cuanto termina
     cargados, _ = helpers.bulk(cliente, acciones, refresh=True)
+    return cargados, largos, segundos
+
+
+def main() -> None:
+    with FRAGMENTOS.open(encoding="utf-8") as archivo:
+        fragmentos = [json.loads(linea) for linea in archivo]
+    cliente = OpenSearch(hosts=[URL_OPENSEARCH])
+    if not cliente.indices.exists(index=INDICE):
+        raise SystemExit(f"No existe el índice {INDICE}; primero: uv run python crear_indice.py")
+
+    cargados, largos, segundos = indexar_fragmentos(cliente, fragmentos)
 
     # 3. Resumen para revisar que todo salió bien
     print(f"\nVectores: {len(largos)} de {DIMENSION} números, largo entre {min(largos):.6f} "

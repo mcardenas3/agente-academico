@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { admin, NoAutorizado, type Dia, type FilaPregunta, type Resumen } from './api'
+import {
+  admin, borrarArticulo, NoAutorizado, subirArticulo, urlPdf,
+  type ArticuloAdmin, type Dia, type FilaPregunta, type Resumen,
+} from './api'
 import { fecha, numero, tiempo } from './formato'
-import { Lightning, LockSimple, MagnifyingGlass, SignOut } from './iconos'
+import { FilePdf, Lightning, LockSimple, MagnifyingGlass, SignOut, Trash, UploadSimple } from './iconos'
 
 const LLAVE_TOKEN = 'admin_token'
 const POR_PAGINA = 25
@@ -148,6 +151,8 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
           <Grafica dias={dias} oscuro={oscuro} />
         </div>
 
+        <Biblioteca token={token} onNoAutorizado={onSalir} />
+
         <div className="card mt-3 overflow-hidden">
           <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
             <h2 className="text-body font-bold text-ink">Conversaciones</h2>
@@ -171,6 +176,130 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+const ESTADOS: Record<ArticuloAdmin['estado'], { texto: string; tono: string }> = {
+  en_cola: { texto: 'En cola', tono: 'warn' },
+  procesando: { texto: 'Procesando', tono: 'brand' },
+  listo: { texto: 'Listo', tono: 'ok' },
+  error: { texto: 'Error', tono: 'bad' },
+}
+
+/** Los artículos de la biblioteca: subir PDFs, ver cómo van y quitarlos. */
+function Biblioteca({ token, onNoAutorizado }: { token: string; onNoAutorizado: () => void }) {
+  const [articulos, setArticulos] = useState<ArticuloAdmin[]>([])
+  const [archivo, setArchivo] = useState<File | null>(null)
+  const [titulo, setTitulo] = useState('')
+  const [subiendo, setSubiendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [entradaKey, setEntradaKey] = useState(0)  // para vaciar el campo de archivo después de subir
+
+  const cargar = useCallback(() => {
+    admin<ArticuloAdmin[]>('articulos', token, {}).then(setArticulos).catch((e) => {
+      if (e instanceof NoAutorizado) onNoAutorizado()
+    })
+  }, [token, onNoAutorizado])
+
+  useEffect(() => { cargar() }, [cargar])
+
+  // Mientras alguno esté en cola o procesándose, se pregunta su avance cada 3 segundos
+  const pendientes = articulos.some((a) => a.estado === 'en_cola' || a.estado === 'procesando')
+  useEffect(() => {
+    if (!pendientes) return
+    const t = setInterval(cargar, 3000)
+    return () => clearInterval(t)
+  }, [pendientes, cargar])
+
+  async function subir(e: React.FormEvent) {
+    e.preventDefault()
+    if (!archivo) return
+    setSubiendo(true)
+    setError(null)
+    try {
+      await subirArticulo(token, archivo, titulo)
+      setArchivo(null)
+      setTitulo('')
+      setEntradaKey((k) => k + 1)
+      cargar()
+    } catch (err) {
+      if (err instanceof NoAutorizado) onNoAutorizado()
+      else setError(err instanceof Error ? err.message : 'No se pudo subir el archivo.')
+    }
+    setSubiendo(false)
+  }
+
+  async function quitar(a: ArticuloAdmin) {
+    if (!window.confirm(`¿Quitar «${a.titulo}» de la biblioteca? Se borran su PDF y sus fragmentos.`)) return
+    try {
+      await borrarArticulo(token, a.id)
+      cargar()
+    } catch (err) {
+      if (err instanceof NoAutorizado) onNoAutorizado()
+      else setError(err instanceof Error ? err.message : 'No se pudo quitar.')
+    }
+  }
+
+  return (
+    <div className="card mt-3 overflow-hidden">
+      <div className="flex items-baseline gap-2 border-b border-line-subtle px-4 py-3">
+        <h2 className="text-body font-bold text-ink">Biblioteca</h2>
+        <span className="text-micro text-ink-faint">artículos que el agente puede consultar</span>
+      </div>
+      <form onSubmit={subir} className="flex flex-wrap items-center gap-2 border-b border-line-subtle px-4 py-3">
+        {/* El botón de archivo del navegador sale en su idioma; se oculta y se usa uno propio */}
+        <label className="btn cursor-pointer">
+          <FilePdf size={15} weight="bold" /> Elegir PDF
+          <input key={entradaKey} type="file" accept="application/pdf,.pdf" className="sr-only"
+            onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
+        </label>
+        <span className="min-w-0 flex-1 truncate text-meta text-ink-muted">
+          {archivo ? `${archivo.name} · ${(archivo.size / 1024 / 1024).toFixed(1)} MB` : 'Ningún archivo elegido'}
+        </span>
+        <input className="campo w-full py-1.5 text-meta sm:w-64" placeholder="Título (opcional: se toma del PDF)"
+          value={titulo} onChange={(e) => setTitulo(e.target.value)} maxLength={300} />
+        <button className="btn btn-primary" disabled={!archivo || subiendo}>
+          <UploadSimple size={15} weight="bold" /> {subiendo ? 'Subiendo…' : 'Subir PDF'}
+        </button>
+        <p className="w-full text-micro text-ink-faint">
+          PDF digital (no escaneado) de hasta 25 MB y 80 páginas. Se procesa con Docling en unos minutos.
+        </p>
+        {error && <p className="w-full text-meta text-[var(--red-11)]">{error}</p>}
+      </form>
+      <ul className="divide-y divide-[var(--mauve-4)]">
+        {articulos.map((a) => {
+          const estado = ESTADOS[a.estado]
+          return (
+            <li key={a.id} className="flex items-start gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  {a.estado === 'listo' ? (
+                    <a href={urlPdf(a.id)} target="_blank" rel="noopener"
+                      className="truncate text-body font-semibold text-ink hover:underline">{a.titulo}</a>
+                  ) : (
+                    <span className="truncate text-body font-semibold text-ink">{a.titulo || 'Leyendo el título del PDF…'}</span>
+                  )}
+                  <span className="chip" data-tone={estado.tono}>{estado.texto}</span>
+                  {a.original && <span className="chip">Original</span>}
+                </div>
+                <div className="mt-0.5 text-micro text-ink-faint">
+                  {a.estado === 'listo' && `${numero(a.paginas)} páginas · ${numero(a.fragmentos)} fragmentos · `}
+                  {a.progreso && <span className="text-brand-ink">{a.progreso} · </span>}
+                  subido {fecha(a.subido_en)}
+                </div>
+                {a.error && <div className="mt-1 text-micro text-[var(--red-11)]">{a.error}</div>}
+              </div>
+              {!a.original && a.estado !== 'procesando' && (
+                <button className="btn btn-ghost px-2" onClick={() => void quitar(a)}
+                  title="Quitar de la biblioteca" aria-label={`Quitar ${a.titulo}`}>
+                  <Trash size={15} weight="bold" />
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

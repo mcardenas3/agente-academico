@@ -67,25 +67,25 @@ FLOTANTES = {DocItemLabel.TABLE, DocItemLabel.PICTURE, DocItemLabel.CAPTION,
              DocItemLabel.FOOTNOTE, DocItemLabel.CODE}
 
 
-def limpiar_texto(texto: str) -> str:
-    """Cambia los caracteres ilegibles por palomitas y normaliza las letras con NFKC."""
+def limpiar_texto(texto: str, ilegible_por: str = PALOMITA) -> str:
+    """Cambia los caracteres ilegibles (en este artículo, palomitas) y normaliza con NFKC."""
     # NFKC convierte variantes "decorativas" en la letra normal: "𝑞" (q matemática) -> "q"
     texto = unicodedata.normalize("NFKC", texto)
-    return texto.replace(ILEGIBLE, PALOMITA)
+    return texto.replace(ILEGIBLE, ilegible_por)
 
 
-def limpiar_textos(doc: DoclingDocument) -> int:
+def limpiar_textos(doc: DoclingDocument, ilegible_por: str = PALOMITA) -> int:
     """Limpia el texto de todos los elementos y de todas las celdas de las tablas."""
     cambiados = 0
     for elemento in doc.texts:
-        limpio = limpiar_texto(elemento.text)
+        limpio = limpiar_texto(elemento.text, ilegible_por)
         if limpio != elemento.text:
             elemento.text = limpio
             cambiados += 1
     for tabla in doc.tables:
         # La tabla guarda sus celdas en table_cells; la cuadrícula (grid) se arma a partir de ellas
         for celda in tabla.data.table_cells:
-            limpio = limpiar_texto(celda.text)
+            limpio = limpiar_texto(celda.text, ilegible_por)
             if limpio != celda.text:
                 celda.text = limpio
                 cambiados += 1
@@ -287,6 +287,29 @@ def asignar_niveles(doc: DoclingDocument) -> None:
 def pagina(elemento) -> int | str:
     """Número de página donde aparece un elemento del documento."""
     return elemento.prov[0].page_no if elemento.prov else "?"
+
+
+# Número de página suelto que Docling leyó como título en cualquier artículo: "23" o "300:23"
+PAGINA_SUELTA = re.compile(r"^\d+(:\d+)?$")
+
+
+def limpieza_generica(doc: DoclingDocument) -> dict:
+    """Las correcciones que sirven para cualquier artículo (los que se suben desde /admin).
+
+    Las demás funciones de este archivo resuelven problemas que solo tiene el survey original (la
+    Tabla 3, sus algoritmos, sus subsecciones en línea) y no se aplican a otros PDFs.
+    """
+    # Un carácter ilegible no se sabe qué era: se quita en vez de adivinarlo
+    textos = limpiar_textos(doc, ilegible_por="")
+    titulos = [e for e, _ in doc.iterate_items() if isinstance(e, SectionHeaderItem)]
+    paginas = 0
+    for titulo in titulos:
+        if PAGINA_SUELTA.match(titulo.text.strip()):
+            cambiar_por_texto(doc, titulo, DocItemLabel.PAGE_HEADER, ContentLayer.FURNITURE)
+            paginas += 1
+    unidos = unir_parrafos_partidos(doc)
+    asignar_niveles(doc)
+    return {"textos": textos, "numeros_de_pagina": paginas, "parrafos_unidos": len(unidos)}
 
 
 def main() -> None:

@@ -7,18 +7,18 @@
     "se abstuvo en las que no cubre": "3/5",
     "cita un fragmento correcto": "20/20",
     "idioma correcto": "25/25",
-    "juez: fiel (sí)": "17/20",
-    "juez: fiel (parcial)": "2/20",
-    "juez: relevancia promedio": 4.9,
-    "segundos promedio": 6.21,
-    "tokens de entrada promedio": 5061
+    "juez: fiel (sí)": "19/20",
+    "juez: fiel (parcial)": "0/20",
+    "juez: relevancia promedio": 4.95,
+    "segundos promedio": 6.67,
+    "tokens de entrada promedio": 4938
   },
   "preguntas": [
     {
       "n": 1,
       "pregunta": "¿Por qué alucinan los modelos de lenguaje y cómo ayuda RAG?",
       "tipo": "conceptual (es)",
-      "respuesta": "Los modelos de lenguaje alucinan principalmente porque no pueden acceder a información actualizada fuera de sus datos de entrenamiento. RAG ayuda a resolver este problema al complementar el conocimiento interno del modelo con información actualizada de fuentes externas mediante un modelo de recuperación, lo que permite generar respuestas más precisas y actuales.",
+      "respuesta": "Los modelos de lenguaje alucinan porque no tienen acceso a información actualizada y dependen de sus datos de entrenamiento. RAG ayuda al complementar el conocimiento interno del modelo con información externa actual mediante un modelo de recuperación, lo que mejora la precisión y la confiabilidad de las respuestas.",
       "citas": [
         "huang2026-rag-survey-005",
         "huang2026-rag-survey-003"
@@ -30,14 +30,14 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 5.72,
-      "tokens_entrada": 4972,
-      "tokens_salida": 216,
+      "segundos": 18.98,
+      "tokens_entrada": 5142,
+      "tokens_salida": 213,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta explica que los modelos de lenguaje alucinan porque no pueden acceder a información actualizada fuera de sus datos de entrenamiento, y que RAG ayuda complementando el conocimiento interno del modelo con información actualizada de fuentes externas mediante un modelo de recuperación. Esto coincide con los fragmentos citados, que afirman que la alucinación se debe a la incapacidad de los LLMs para acceder a información actualizada y que RAG resuelve este problema mediante la incorporación de información externa.",
-      "juez_segundos": 4.21
+      "juez_motivo": "La respuesta explica que los modelos de lenguaje alucinan por no tener acceso a información actualizada y dependen de sus datos de entrenamiento, y que RAG ayuda complementando el conocimiento interno con información externa mediante un modelo de recuperación. Esto coincide con los fragmentos citados, que también afirman que la alucinación se debe a la incapacidad de acceder a información actualizada y que RAG suplementa el conocimiento interno con información externa para mejorar la precisión.",
+      "juez_segundos": 8.36
     },
     {
       "n": 2,
@@ -46,8 +46,7 @@
       "respuesta": "Las fases del paradigma RAG son: pre-retrieval, retrieval, post-retrieval y generación.",
       "citas": [
         "huang2026-rag-survey-010",
-        "huang2026-rag-survey-004",
-        "huang2026-rag-survey-014",
+        "huang2026-rag-survey-011",
         "huang2026-rag-survey-012"
       ],
       "fragmentos_correctos": [
@@ -57,25 +56,24 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 4.32,
-      "tokens_entrada": 3967,
-      "tokens_salida": 204,
+      "segundos": 6.63,
+      "tokens_entrada": 4136,
+      "tokens_salida": 188,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta enumera cuatro fases del paradigma RAG: pre-retrieval, retrieval, post-retrieval y generación. Los fragmentos citados del artículo describen explícitamente estas cuatro fases, confirmando que la respuesta es coherente con el contenido del artículo.",
-      "juez_segundos": 2.78
+      "juez_motivo": "La respuesta enumera las fases del paradigma RAG como pre-requisito, recuperación, post-recuperación y generación, lo cual coincide con la descripción del artículo que indica que el paradigma está estructurado en cuatro fases principales: pre-requisito, recuperación, post-recuperación y generación.",
+      "juez_segundos": 2.46
     },
     {
       "n": 3,
       "pregunta": "¿En qué se diferencian BM25 y los recuperadores basados en modelos de lenguaje?",
       "tipo": "conceptual (es)",
-      "respuesta": "BM25 es un retriever tradicional que se basa en coincidencias de palabras y es rápido y eficiente, mientras que los recuperadores basados en modelos de lenguaje utilizan modelos pre-entrenados como BERT para entender el significado semántico de las consultas y documentos, lo que permite recuperar documentos relevantes incluso sin coincidencias exactas de palabras.",
+      "respuesta": "BM25 es un algoritmo tradicional de recuperación que se basa en la frecuencia de términos y su presencia en los documentos, priorizando coincidencias lexicográficas. Los recuperadores basados en modelos de lenguaje, en cambio, utilizan embeddings semánticos y modelos pre-entrenados como BERT para capturar la esencia semántica de las consultas, permitiendo identificar documentos relacionados de forma más amplia y flexible. La elección entre ambos depende de la necesidad de velocidad y simplicidad (BM25) versus la comprensión semántica y precisión (modelos de lenguaje).",
       "citas": [
-        "huang2026-rag-survey-049",
         "huang2026-rag-survey-050",
         "huang2026-rag-survey-008",
-        "huang2026-rag-survey-060"
+        "huang2026-rag-survey-049"
       ],
       "fragmentos_correctos": [
         "huang2026-rag-survey-008"
@@ -84,20 +82,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 5.55,
-      "tokens_entrada": 4485,
-      "tokens_salida": 268,
+      "segundos": 7.2,
+      "tokens_entrada": 4748,
+      "tokens_salida": 297,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta compara correctamente BM25 como un retriever tradicional basado en coincidencias de palabras y rápido, y los recuperadores basados en modelos de lenguaje como BERT como los que usan vectores y comprenden el significado semántico. Esto está respaldado por los fragmentos citados.",
-      "juez_segundos": 3.11
+      "juez_motivo": "La respuesta compara correctamente BM25 como un algoritmo tradicional que usa frecuencia de términos y coincidencias lexicográficas, y los recuperadores basados en modelos de lenguaje como BERT que usan embeddings semánticos y capturan la esencia semántica de las consultas. También menciona que la elección depende de velocidad y simplicidad (BM25) versus comprensión semántica y precisión (modelos de lenguaje), lo cual está respaldado por los fragmentos citados.",
+      "juez_segundos": 5.39
     },
     {
       "n": 4,
       "pregunta": "¿Cómo funciona el hashing sensible a la localidad para buscar vecinos cercanos?",
       "tipo": "conceptual (es)",
-      "respuesta": "El hashing sensible a la localidad (LSH) funciona mapeando vectores similares a valores hash cercanos o iguales, de modo que los vecinos cercanos se agrupan en el mismo bucket. Esto permite recuperar rápidamente candidatos que comparten el mismo hash, reduciendo la dimensionalidad y acelerando la búsqueda, aunque puede introducir pequeñas inacuracias.",
+      "respuesta": "El hashing sensible a la localidad (LSH) funciona mapeando vectores similares a valores hash cercanos o iguales, de modo que los vecinos cercanos se agrupan en el mismo bucket. Esto permite recuperar rápidamente candidatos que comparten el mismo hash, reduciendo la complejidad del problema y acelerando la búsqueda, aunque puede introducir pequeñas inacuracias.",
       "citas": [
         "huang2026-rag-survey-017"
       ],
@@ -108,20 +106,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 4.51,
-      "tokens_entrada": 4036,
-      "tokens_salida": 214,
+      "segundos": 5.54,
+      "tokens_entrada": 4204,
+      "tokens_salida": 216,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "El answer describe correctamente que el LSH mapea vectores similares a valores hash cercanos o iguales, agrupa vecinos cercanos en el mismo bucket y permite recuperar rápidamente candidatos con el mismo hash, reduciendo la dimensionalidad y acelerando la búsqueda, aunque puede introducir inacuracias. Esto coincide con los fragmentos citados.",
-      "juez_segundos": 2.72
+      "juez_motivo": "El answer describe correctamente que el LSH mapea vectores similares a valores hash cercanos o iguales, agruparlos en el mismo bucket y recuperar rápidamente candidatos con el mismo hash, lo que reduce la complejidad y acelera la búsqueda. Esto está bien respaldado por los fragmentos citados.",
+      "juez_segundos": 2.47
     },
     {
       "n": 5,
       "pregunta": "¿Qué estrategias existen para modificar la consulta del usuario?",
       "tipo": "conceptual (es)",
-      "respuesta": "Existen tres estrategias principales para modificar la consulta del usuario: expansión de consulta, reformulación de consulta y reescritura basada en prompts. La expansión agrega términos relacionados para ampliar el alcance, la reformulación mejora la claridad y precisión, y la reescritura basada en prompts utiliza instrucciones para guiar la comprensión del modelo. Además, hay estrategias adaptativas que ajustan dinámicamente la estrategia de recuperación según el contexto.",
+      "respuesta": "Existen tres estrategias principales para modificar la consulta del usuario: expansión de consulta, reformulación de consulta y reescritura basada en prompts. La expansión agrega términos relacionados para ampliar el alcance, la reformulación mejora la claridad y precisión, y la reescritura basada en prompts utiliza instrucciones para guiar la comprensión del modelo. Además, hay estrategias adaptativas que ajustan dinámicamente la estrategia de recuperación según el contexto. Estas estrategias buscan reducir la brecha entre la expresión del usuario y la información relevante en los documentos.",
       "citas": [
         "huang2026-rag-survey-020",
         "huang2026-rag-survey-021",
@@ -136,20 +134,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 5.57,
-      "tokens_entrada": 4570,
-      "tokens_salida": 273,
+      "segundos": 7.13,
+      "tokens_entrada": 4740,
+      "tokens_salida": 295,
       "error": null,
-      "juez_fiel": "parcial",
+      "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta enumera tres estrategias: expansión de consulta, reformulación de consulta y reescritura basada en prompts, lo cual coincide con los fragmentos citados. Además, menciona estrategias adaptativas y personalización, que también están presentes en los fragmentos. Sin embargo, la respuesta incluye información sobre personalización que no está en los fragmentos citados, lo que podría ser irrelevante para la pregunta.",
-      "juez_segundos": 3.58
+      "juez_motivo": "La respuesta enumera tres estrategias: expansión de consulta, reformulación de consulta y reescritura basada en prompts, lo cual coincide con los fragmentos citados. Además, menciona estrategias adaptativas y su objetivo de reducir la brecha entre la expresión del usuario y la información relevante, lo cual está respaldado por los fragmentos.",
+      "juez_segundos": 2.88
     },
     {
       "n": 6,
       "pregunta": "¿Qué es la reformulación de consultas y qué métodos la usan?",
       "tipo": "conceptual (es)",
-      "respuesta": "La reformulación de consultas es un proceso que modifica la consulta original para hacerla más clara y precisa, ayudando al sistema de recuperación a entender mejor la intención del usuario. Se utiliza en la etapa de manipulación de consultas. Los métodos incluyen: reformulación de una sola vez, como RQ-ARAG [14], que reescribe y simplifica la consulta; y enfoques iterativos, como Rewrite-Retrieve-Read [109] o FLARE [73], que refinan la consulta durante el proceso de recuperación y generación. También hay estrategias basadas en prompts, como Step-Back [189] o CoK [96], que guían la comprensión de la consulta mediante instrucciones. Además, se usan técnicas de expansión de consulta, como Query2doc [162] o FiD [64], que añaden términos relacionados o recuperan información adicional para enriquecer la consulta. La reformulación busca reducir la brecha entre la expresión del usuario y la información relevante en los documentos.",
+      "respuesta": "La reformulación de consultas es un proceso que modifica la consulta original para hacerla más clara y precisa, ayudando al sistema de recuperación a entender mejor la intención del usuario. Se utiliza para mejorar la calidad de la información recuperada. Los métodos incluyen: reformulación de una sola vez (como RQ-RAG), reformulación iterativa (como Rewrite-Retrieve-Read y FLARE), expansión de consultas (añadiendo términos relacionados), y reescritura basada en prompts (como Step-Back o CoK). También se mencionan técnicas como normalización de consultas y prompt-based rewriting. Estas estrategias buscan reducir la brecha entre la expresión del usuario y la información relevante en los documentos.",
       "citas": [
         "huang2026-rag-survey-021",
         "huang2026-rag-survey-020",
@@ -163,20 +161,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 7.31,
-      "tokens_entrada": 4345,
-      "tokens_salida": 405,
+      "segundos": 7.44,
+      "tokens_entrada": 4515,
+      "tokens_salida": 333,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta describe la reformulación de consultas como un proceso que modifica la consulta original para hacerla más clara y precisa, lo cual está respaldado por los fragmentos. También menciona métodos como RQ-ARAG, Rewrite-Retrieve-Read, FLARE, Step-Back, CoK, Query2doc, FiD, y estrategias de expansión y prompts, que coinciden con los fragmentos citados. La respuesta aborda la pregunta sobre qué es la reformulación y qué métodos la usan, y los fragmentos explican estos conceptos y métodos. La relevancia es alta porque la respuesta cubre directamente los puntos de la pregunta.",
-      "juez_segundos": 4.65
+      "juez_motivo": "La respuesta describe la reformulación de consultas como un proceso que modifica la consulta original para hacerla más clara y precisa, lo cual está respaldado por los fragmentos. También menciona métodos como reformulación de una sola vez (RQ-RAG), reformulación iterativa (Rewrite-Retrieve-Read, FLARE), expansión de consultas, reescritura basada en prompts (Step-Back, CoK), normalización de consultas y reescritura basada en prompts. Estos métodos están mencionados en los fragmentos, por lo que la respuesta es coherente con la información proporcionada.",
+      "juez_segundos": 5.22
     },
     {
       "n": 7,
       "pregunta": "¿Qué diferencia hay entre la recuperación iterativa y la recursiva?",
       "tipo": "conceptual (es)",
-      "respuesta": "La recuperación iterativa y la recursiva son dos estrategias de recuperación en RAG. La iterativa utiliza un bucle entre recuperación y generación para refinar la consulta y el contexto en múltiples pasos, lo que permite razonamiento multi-entrada. La recursiva, en cambio, organiza el conocimiento en una estructura jerárquica o gráfica y navega desde información general a detalles específicos, sin depender de un bucle entre recuperación y generación. Ambas permiten un manejo más profundo de preguntas complejas, pero difieren en su mecanismo: la iterativa es secuencial y dinámica, mientras que la recursiva es estructural y jerárquica.",
+      "respuesta": "La recuperación iterativa y la recursiva son dos estrategias de recuperación en RAG. La iterativa utiliza un bucle entre recuperación y generación, donde cada paso puede guiar la siguiente búsqueda, permitiendo razonamiento multi-étapa y refinamiento del contexto. La recursiva, en cambio, organiza el conocimiento en una estructura jerárquica o gráfica y navega desde información general a detalles específicos, ajustando la búsqueda en cada capa sin modificar la consulta. Ambas permiten un manejo más profundo de preguntas complejas, pero la iterativa es más dinámica y basada en retroalimentación, mientras que la recursiva depende de una estructura predefinida del conocimiento. Las diferencias en complejidad y costo también varían: la iterativa tiene complejidad media y costo medio-alto, mientras que la recursiva tiene complejidad alta y costo medio.}",
       "citas": [
         "huang2026-rag-survey-025",
         "huang2026-rag-survey-026",
@@ -192,20 +190,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 6.44,
-      "tokens_entrada": 4877,
-      "tokens_salida": 318,
+      "segundos": 10.32,
+      "tokens_entrada": 5047,
+      "tokens_salida": 363,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta describe la recuperación iterativa como un bucle entre recuperación y generación que refina la consulta y el contexto en múltiples pasos, y la recursiva como una estructura jerárquica que navega desde información general a detalles específicos sin depender de un bucle. Esto coincide con los fragmentos citados, que definen la iterativa como \"secuencially decomposes a query into simpler retrieval steps\" y la recursiva como \"indexes knowledge in a tree/graph for multi-level retrieval\".",
-      "juez_segundos": 4.3
+      "juez_motivo": "La respuesta describe la diferencia entre recuperación iterativa y recursiva, mencionando que la iterativa usa bucles y retroalimentación, mientras que la recursiva organiza el conocimiento en estructuras jerárquicas y navega desde general a específico. Esto coincide con los fragmentos citados, que definen ambas estrategias con características similares.",
+      "juez_segundos": 3.14
     },
     {
       "n": 8,
       "pregunta": "En la recuperación adaptativa, ¿cómo decide el modelo cuándo recuperar más información?",
       "tipo": "conceptual (es)",
-      "respuesta": "El modelo decide cuándo recuperar más información mediante una estrategia adaptativa que monitorea la confianza en la generación. Si la confianza es baja, activa la recuperación adicional para obtener más contexto. Si la confianza es alta, detiene la recuperación. Esta estrategia se implementa en el algoritmo adaptativo descrito en el artículo.",
+      "respuesta": "El modelo decide cuándo recuperar más información mediante una estrategia adaptativa que monitorea la confianza en los tokens generados. Si la confianza es baja, activa la recuperación adicional para obtener información nueva. Si la confianza es alta, detiene la recuperación. Esta estrategia se implementa en el algoritmo Adaptive Retrieval Strategy, donde se utiliza una función de retroalimentación para evaluar la calidad de la generación y ajustar dinámicamente la consulta y el contexto. Si la retroalimentación es negativa, se ajusta la consulta y el contexto; si es positiva, se detiene la iteración. Esta estrategia permite una recuperación más flexible y precisa, pero aumenta la complejidad del sistema.",
       "citas": [
         "huang2026-rag-survey-028",
         "huang2026-rag-survey-032"
@@ -218,20 +216,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 5.82,
-      "tokens_entrada": 5226,
-      "tokens_salida": 221,
+      "segundos": 7.04,
+      "tokens_entrada": 5413,
+      "tokens_salida": 300,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta describe que el modelo decide recuperar más información cuando la confianza es baja y detiene la recuperación cuando es alta, lo cual coincide con el algoritmo Adaptive Retrieval Strategy en el artículo. El fragmento menciona que el modelo \"actively decides when to retrieve more information by monitoring the probability of the tokens it is generating\" y que \"if Ffeedback (yi, D′ i) is negative then\" activa ajustes, lo que implica baja confianza. Además, \"BREAK\" se ejecuta si la retroalimentación es positiva, indicando alta confianza. Por lo tanto, la respuesta es coherente con los fragmentos citados.",
-      "juez_segundos": 4.41
+      "juez_motivo": "La respuesta describe que el modelo decide recuperar más información basándose en la confianza en los tokens generados, usando una estrategia adaptativa que monitorea la confianza y ajusta dinámicamente la consulta y el contexto. Esto coincide con el algoritmo Adaptive Retrieval Strategy descrito en los fragmentos, donde se utiliza una función de retroalimentación para evaluar la calidad de la generación y detener la iteración si la retroalimentación es positiva. La respuesta también menciona que si la retroalimentación es negativa, se ajusta la consulta y el contexto, lo cual está soportado por el algoritmo.",
+      "juez_segundos": 3.93
     },
     {
       "n": 9,
       "pregunta": "¿Cómo funcionan los modelos supervisados de reordenamiento?",
       "tipo": "conceptual (es)",
-      "respuesta": "Los modelos supervisados de reordenamiento se entrenan con conjuntos de datos que incluyen etiquetas de relevancia explícitas. Se ajustan finamente para mejorar la precisión en dominios específicos. Se utilizan enfoques como BERT como cross-encoders para procesar consultas y documentos juntos y generar puntuaciones de relevancia, aunque son computacionalmente costosos. También se emplean modelos encoder-decoder como T5, que generan tokens como \"true\" o \"false\" para indicar relevancia. Además, modelos como FiD-Light y GenRT utilizan mecanismos auto-regresivos para generar listas ordenadas de documentos. Técnicas más recientes, como RankLLaMA, se centran en la representación del último token generado para calcular relevancia. También se utiliza la distilación de conocimiento para mejorar otros componentes del pipeline RAG. Para mejorar la calidad de los datos de entrenamiento, se emplean técnicas de ampliación de datos, como PROMPTAGATOR y DKS-RAC, que generan ejemplos sintéticos o señales supervisivas más detalladas.",
+      "respuesta": "Los modelos supervisados de reordenamiento se entrenan con conjuntos de datos que incluyen etiquetas de relevancia explícitas. Se afinan modelos como BERT como cross-encoders para calcular una puntuación de relevancia para cada documento y consulta. También se utilizan modelos encoder-decoder como T5, que generan tokens como \"true\" o \"false\" para indicar si un documento es relevante. Otros enfoques, como FiD-Light y GenRT, emplean mecanismos auto-regresivos para generar listas ordenadas de documentos. Además, técnicas basadas en prompts, como RankLLaMA, se centran en la representación del último token generado para evaluar relevancia. Estos modelos suelen mejorar el pipeline de RAG mediante distilación de conocimiento.",
       "citas": [
         "huang2026-rag-survey-034",
         "huang2026-rag-survey-033",
@@ -244,20 +242,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 7.93,
-      "tokens_entrada": 4736,
-      "tokens_salida": 431,
+      "segundos": 7.26,
+      "tokens_entrada": 4923,
+      "tokens_salida": 320,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta describe cómo funcionan los modelos supervisados de reordenamiento, incluyendo su entrenamiento con etiquetas de relevancia, uso de modelos como BERT, T5, FiD-Light, GenRT, RankLLaMA y técnicas de distilación y ampliación de datos. Los fragmentos citados del artículo describen exactamente estos aspectos: el entrenamiento con etiquetas explícitas, el uso de BERT como cross-encoder, T5 como encoder-decoder, FiD-Light y GenRT como modelos auto-regresivos, RankLLaMA que se centra en el último token, y técnicas de distilación y ampliación de datos como PROMPTAGATOR y DKS-RAC. La respuesta es coherente y completa con los fragmentos.",
-      "juez_segundos": 5.11
+      "juez_motivo": "La respuesta describe cómo funcionan los modelos supervisados de reordenamiento, incluyendo ejemplos como BERT como cross-encoders, T5 como encoder-decoder, FiD-Light y GenRT con mecanismos auto-regresivos, y RankLLaMA con enfoque en el último token. También menciona la distilación de conocimiento y mejora del pipeline RAG. Los fragmentos citados del artículo describen exactamente estos modelos y enfoques, confirmando que la respuesta es coherente con el contenido del artículo.",
+      "juez_segundos": 3.35
     },
     {
       "n": 10,
       "pregunta": "¿Para qué sirve filtrar los documentos recuperados?",
       "tipo": "conceptual (es)",
-      "respuesta": "Filtrar los documentos recuperados sirve para eliminar aquellos que no son relevantes o tienen baja calidad, reduciendo el tamaño del conjunto de documentos y mejorando la eficiencia y efectividad de los pasos posteriores en el sistema de generación asistida por recuperación.",
+      "respuesta": "Filtrar los documentos recuperados sirve para eliminar aquellos que no son relevantes o tienen baja calidad, reduciendo el tamaño del conjunto de documentos y mejorando la eficiencia y efectividad de los pasos posteriores en el sistema RAG.",
       "citas": [
         "huang2026-rag-survey-036",
         "huang2026-rag-survey-013",
@@ -271,20 +269,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 4.58,
-      "tokens_entrada": 4150,
-      "tokens_salida": 210,
+      "segundos": 4.9,
+      "tokens_entrada": 4317,
+      "tokens_salida": 204,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta explica que filtrar documentos recuperados sirve para eliminar aquellos que no son relevantes o tienen baja calidad, reduciendo el tamaño del conjunto y mejorando la eficiencia y efectividad de los pasos posteriores. Esto coincide con los fragmentos citados, que describen que el filtrado elimina documentos irrelevantes o de baja calidad para mejorar la eficiencia y efectividad de los pasos posteriores.",
-      "juez_segundos": 3.43
+      "juez_motivo": "La respuesta explica que filtrar documentos recuperados sirve para eliminar aquellos que no son relevantes o tienen baja calidad, reduciendo el tamaño del conjunto y mejorando la eficiencia y efectividad de los pasos posteriores en RAG. Esto coincide con los fragmentos citados, que describen que el filtrado elimina documentos irrelevantes o de baja calidad para mejorar la eficiencia y efectividad de los pasos posteriores.",
+      "juez_segundos": 2.92
     },
     {
       "n": 11,
       "pregunta": "¿Cómo se combinan varios documentos recuperados al generar la respuesta?",
       "tipo": "conceptual (es)",
-      "respuesta": "Se combinan varios documentos recuperados procesando todos los documentos juntos para formar una respuesta más completa, o tratando cada documento como una fuente independiente y combinando sus salidas, o integrando el conocimiento directamente en los parámetros del modelo.",
+      "respuesta": "Se combinan varios documentos recuperados procesando todos los documentos juntos para formar una respuesta más completa, o tratando cada documento como una fuente independiente y combinando sus salidas, o integrando la información en los parámetros del modelo.",
       "citas": [
         "huang2026-rag-survey-039",
         "huang2026-rag-survey-038",
@@ -297,20 +295,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 4.75,
-      "tokens_entrada": 4481,
-      "tokens_salida": 213,
+      "segundos": 5.19,
+      "tokens_entrada": 4651,
+      "tokens_salida": 212,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta describe tres estrategias para combinar documentos recuperados: procesar todos juntos (como en FiD), tratar cada uno independientemente (como en REPLUG) y integrar conocimiento en parámetros (como en P-ARAG). Estas estrategias están presentes en los fragmentos citados, que describen métodos similares como procesar documentos juntos (FiD), procesar cada documento por separado (REPLUG) y usar representaciones paramétricas (P-ARAG). La respuesta es coherente con los fragmentos.",
-      "juez_segundos": 3.89
+      "juez_motivo": "La respuesta describe tres estrategias para combinar documentos recuperados: procesar todos juntos (como en FiD), tratar cada uno independientemente (como en REPLUG) y integrar información en parámetros del modelo (como en P-ARAG). Estas estrategias están presentes en los fragmentos citados, que describen métodos similares como procesar documentos juntos (FiD), procesar cada documento por separado (REPLUG) y usar representaciones paramétricas (P-ARAG).",
+      "juez_segundos": 3.21
     },
     {
       "n": 12,
       "pregunta": "¿Cómo se personalizan las respuestas para cada usuario?",
       "tipo": "conceptual (es)",
-      "respuesta": "Las respuestas se personalizan adaptando tanto el proceso de recuperación como la generación a las necesidades y contexto de cada usuario. Esto incluye el uso de estrategias como ROPG [136] para seleccionar estrategias de recuperación personalizadas, CFRAG [140] para aprovechar el historial de usuarios similares y PGraphRAG [7] para construir un grafo centrado en el usuario. Además, se emplean enfoques como PersonaRAG [185] para actualizar dinámicamente la comprensión del usuario durante una sesión, y ERAGent [142] para integrar preferencias explícitas en la generación. Estas técnicas permiten respuestas más relevantes y adaptadas a cada usuario.",
+      "respuesta": "Las respuestas se personalizan adaptando tanto el proceso de recuperación como la generación a las necesidades, preferencias y contexto histórico de cada usuario. Esto incluye el uso de estrategias colaborativas y de grafos para manejar el problema de inicio frío, así como sistemas que actualizan dinámicamente el entendimiento del usuario durante una sesión.",
       "citas": [
         "huang2026-rag-survey-042",
         "huang2026-rag-survey-041",
@@ -324,25 +322,26 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 8.42,
-      "tokens_entrada": 4430,
-      "tokens_salida": 316,
+      "segundos": 5.36,
+      "tokens_entrada": 4600,
+      "tokens_salida": 229,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta describe cómo se personalizan las respuestas para cada usuario, mencionando estrategias como ROPG, CFRAG, PGraphRAG, PersonaRAG y ERAGent, y explica que estas técnicas permiten respuestas más relevantes y adaptadas. Los fragmentos citados del artículo describen exactamente estas estrategias: ROPG, CFRAG, PGraphRAG, PersonaRAG y ERAGent, y su objetivo de personalización centrada en el usuario. La respuesta se basa directamente en los fragmentos proporcionados.",
-      "juez_segundos": 4.23
+      "juez_motivo": "La respuesta describe cómo se personalizan las respuestas adaptando recuperación y generación a necesidades, preferencias y contexto histórico del usuario, utilizando estrategias colaborativas y de grafos para el problema de inicio frío y sistemas que actualizan dinámicamente el entendimiento del usuario. Esto coincide con los fragmentos citados que mencionan personalización mediante recuperación adaptada, filtros colaborativos, grafos centrados en el usuario y actualización dinámica del entendimiento del usuario.",
+      "juez_segundos": 3.09
     },
     {
       "n": 13,
       "pregunta": "¿Qué métricas y conjuntos de datos se usan para evaluar RAG?",
       "tipo": "conceptual (es)",
-      "respuesta": "Para evaluar RAG, se utilizan métricas como Exact Match (EM), F1, MAP, MRR, NDCG, BEM, ROUGE, BLEU, Accuracy, Precision, Recall, Hit Rate, Accuracy (QA), BLEU (Generation), ROUGE-L (Generation), and Faithfulness. Los conjuntos de datos incluyen TriviaQA, HotpotQA, FEVER, Natural Questions (NQ), Wizard of Wikipedia (WoW), T-REX, KILT, PopQA, NoMIRACL, UDCG, EventKG, UJ, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, BioASQ, WikiEval, KILT, SuperGLUE, EventKG, UJ, etc.",
+      "respuesta": "Para evaluar RAG, se utilizan métricas como Exact Match (EM), F1, MAP, MRR, NDCG, BEM, BLEU, ROUGE, Accuracy, Precision, Recall, Hit Rate, Confidence Intervals, Accuracy (QA), BLEU (Generation), ROUGE-L (Generation), and métricas de robustez como Error Detection Rate, Error Correction Rate, Misleading Rate, Mistake Reappearance Rate. Los conjuntos de datos incluyen TriviaQA, HotpotQA, FEVER, Natural Questions (NQ), Wizard of Wikipedia (WoW), T-REX, KILT, PopQA, NoMIRACL, UJ, EventKG, UDCG, WikiEval, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, y otros como EventKG, UJ, y datasets sintéticos.",
       "citas": [
         "huang2026-rag-survey-043",
-        "huang2026-rag-survey-046",
+        "huang2026-rag-survey-044",
         "huang2026-rag-survey-045",
-        "huang2026-rag-survey-044"
+        "huang2026-rag-survey-046",
+        "huang2026-rag-survey-047"
       ],
       "fragmentos_correctos": [
         "huang2026-rag-survey-043"
@@ -351,26 +350,24 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 9.58,
-      "tokens_entrada": 4617,
-      "tokens_salida": 364,
+      "segundos": 8.04,
+      "tokens_entrada": 4786,
+      "tokens_salida": 403,
       "error": null,
       "juez_fiel": "no",
       "juez_relevancia": 4,
-      "juez_motivo": "La respuesta enumera métricas como EM, F1, MAP, MRR, NDCG, BEM, ROUGE, BLEU, Accuracy, Precision, Recall, Hit Rate, Accuracy (QA), BLEU (Generation), ROUGE-L (Generation) y Faithfulness, y conjuntos de datos como TriviaQA, HotpotQA, FEVER, NQ, WoW, T-REX, KILT, PopQA, NoMIRACL, UDCG, EventKG, UJ, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, BioASQ, WikiEval, SuperGLUE. Sin embargo, los fragmentos citados solo mencionan métricas como EM, F1, MAP, MRR, NDCG, BEM, ROUGE, BLEU, Accuracy, Precision, Recall, Hit Rate y datasets como TriviaQA, HotpotQA, FEVER, NQ, WoW, T-REX, KILT, PopQA, NoMIRACL, UDCG, EventKG, UJ, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, BioASQ, WikiEval, SuperGLUE. La respuesta incluye métricas y conjuntos de datos adicionales no mencionados en los fragmentos, como BEM, BLEU (Generation), ROUGE-L (Generation), y Faithfulness, que no están presentes en los fragmentos. Además, la respuesta no se limita a los conjuntos de datos mencionados en los fragmentos, como MMLU-Med, MedQA-US, etc., que sí están citados. Por lo tanto, la respuesta no está completamente alineada con los fragmentos.",
-      "juez_segundos": 10.09
+      "juez_motivo": "La respuesta enumera métricas como Exact Match (EM), F1, MAP, MRR, NDCG, BEM, BLEU, ROUGE, Accuracy, Precision, Recall, Hit Rate, Confidence Intervals, Accuracy (QA), BLEU (Generation), ROUGE-2 (Generation), Error Detection Rate, Error Correction Rate, Misleading Rate, Mistake Reappearance Rate, y conjuntos de datos como TriviaQA, HotpotQA, FEVER, NQ, WoW, T-REX, KILT, PopQA, NoMIRACL, UJ, EventKG, UDCG, WikiEval, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, y otros. Sin embargo, los fragmentos citados solo mencionan EM, F1, BEM, BLEU, ROUGE-2, Accuracy, Precision, Recall, Hit Rate, MAP, MRR, NDCG, y datasets como TriviaQA, HotpotQA, FEVER, NQ, WoW, T-REX, KILT, UJ, EventKG, UDCG, WikiEval, MMLU-Med, MedQA-US, MedMCQA, PubMedQA. La respuesta incluye métricas y conjuntos de datos no mencionados en los fragmentos, y algunas métricas mencionadas en los fragmentos (como BEM, BLEU, ROUGE-2) no están en la respuesta. Además, la respuesta no menciona que los conjuntos de datos como MMLU-Med, MedQA-US, etc., están en los fragmentos. Por lo tanto, la respuesta no está completamente alineada con los fragmentos.",
+      "juez_segundos": 7.32
     },
     {
       "n": 14,
       "pregunta": "¿Cómo se comprime el contexto para que la generación sea más rápida?",
       "tipo": "conceptual (es)",
-      "respuesta": "Para acelerar la generación, se comprime el contexto mediante técnicas que reducen el número de tokens o la complejidad computacional. Esto se logra mediante métodos de selección esparsa (como Focus Mode y Sparse RAG) y métodos basados en embeddings (como xRAG y COCOM), que reemplazan el texto por vectores densos o seleccionan solo los fragmentos más relevantes. Estas técnicas reducen significativamente las operaciones computacionales, mejorando la velocidad de inferencia.",
+      "respuesta": "Para acelerar la generación, se comprime el contexto mediante técnicas que reducen el número de tokens o la longitud del input. Se seleccionan solo los fragmentos más relevantes (selección esparsa) o se reemplazan el texto por vectores de embeddings (compresión por embeddings). Por ejemplo, métodos como Sparse RAG, xRAG y COCOM logran mejoras significativas en la eficiencia computacional.",
       "citas": [
         "huang2026-rag-survey-069",
-        "huang2026-rag-survey-038",
         "huang2026-rag-survey-024",
-        "huang2026-rag-survey-072",
-        "huang2026-rag-survey-037"
+        "huang2026-rag-survey-072"
       ],
       "fragmentos_correctos": [
         "huang2026-rag-survey-069"
@@ -379,24 +376,25 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 8.26,
-      "tokens_entrada": 4592,
-      "tokens_salida": 305,
+      "segundos": 5.7,
+      "tokens_entrada": 4778,
+      "tokens_salida": 255,
       "error": null,
-      "juez_fiel": "parcial",
-      "juez_relevancia": 4,
-      "juez_motivo": "La respuesta menciona técnicas de compresión de contexto como Focus Mode, Sparse RAG, xRAG y COCOM, que están presentes en los fragmentos citados. Sin embargo, la respuesta no está directamente relacionada con la pregunta sobre cómo se comprime el contexto para que la generación sea más rápida, sino que describe más de un enfoque de compresión y su impacto en la eficiencia. La pregunta se centra en la compresión para acelerar la generación, y la respuesta aborda esto parcialmente, pero también incluye información adicional sobre otros métodos de compresión y su efecto en la eficiencia.",
-      "juez_segundos": 4.73
+      "juez_fiel": "si",
+      "juez_relevancia": 5,
+      "juez_motivo": "La respuesta explica que se comprime el contexto mediante técnicas que reducen el número de tokens o la longitud del input, usando selección dispersa o compresión por embeddings. Menciona métodos como Sparse RAG, xRAG y COCOM que mejoran la eficiencia computacional. Los fragmentos del artículo describen exactamente estas técnicas: Sparse RAG selecciona solo los documentos más relevantes, xRAG usa embeddings de documentos como entrada directa, y COCOM comprime documentos largos en embeddings. Además, los fragmentos mencionan mejoras en operaciones flotantes y velocidad de inferencia, lo que coincide con lo que dice la respuesta.",
+      "juez_segundos": 3.72
     },
     {
       "n": 15,
       "pregunta": "¿Más documentos en un contexto largo siempre mejoran la respuesta?",
       "tipo": "conceptual (es)",
-      "respuesta": "No, más documentos en un contexto largo no siempre mejoran la respuesta. A veces, el rendimiento puede disminuir debido a problemas como el sesgo posicional y la introducción de documentos irrelevantes.",
+      "respuesta": "No, más documentos en un contexto largo no siempre mejoran la respuesta. A veces, al aumentar el número de documentos recuperados, el rendimiento de los modelos de lenguaje a largo contexto puede mejorar inicialmente y luego disminuir, formando una curva en forma de U invertida. Esto se debe a factores como la presencia de documentos irrelevantes (negativos duros), el sesgo posicional donde la información del medio se ignora, y la fragmentación de los documentos que dificulta la comprensión del modelo.",
       "citas": [
         "huang2026-rag-survey-071",
         "huang2026-rag-survey-072",
-        "huang2026-rag-survey-038"
+        "huang2026-rag-survey-038",
+        "huang2026-rag-survey-039"
       ],
       "fragmentos_correctos": [
         "huang2026-rag-survey-071"
@@ -405,20 +403,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 6.25,
-      "tokens_entrada": 4594,
-      "tokens_salida": 209,
+      "segundos": 6.3,
+      "tokens_entrada": 4781,
+      "tokens_salida": 285,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "La respuesta afirma que más documentos en un contexto largo no siempre mejoran la respuesta, y menciona problemas como el sesgo posicional y documentos irrelevantes. Los fragmentos citados explican que el rendimiento puede disminuir con más documentos debido al sesgo posicional (\"lost in the middle\") y la introducción de documentos irrelevantes (\"hard negatives\"), lo que distrae al modelo y reduce la precisión. Esto coincide con la información del artículo.",
-      "juez_segundos": 3.73
+      "juez_motivo": "La respuesta afirma que más documentos en un contexto largo no siempre mejoran la respuesta, y menciona que el rendimiento puede mejorar inicialmente y luego disminuir, formando una curva U invertida. Esto se basa en los fragmentos citados que describen el fenómeno de \"inverted U-shaped\" performance curve, hard negatives, positional bias y fragmentación de documentos.",
+      "juez_segundos": 3.09
     },
     {
       "n": 16,
       "pregunta": "What is HyDE and how does it improve retrieval?",
       "tipo": "término (en)",
-      "respuesta": "HyDE is a technique that generates a pseudo-document to capture the essence of a query, especially when the query is poorly expressed or lacks sufficient context. This helps retrieval systems find more relevant documents even from suboptimal queries, improving retrieval accuracy. However, it comes with a trade-off in computational cost. The method is described in [41].",
+      "respuesta": "HyDE is a technique that generates a pseudo-document to capture the essence of a query, enabling retrieval systems to find more relevant documents even when the query is poorly expressed or lacks sufficient context. This improves retrieval accuracy, though it comes with a tradeoff in computational cost.",
       "citas": [
         "huang2026-rag-survey-066"
       ],
@@ -429,20 +427,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 6.02,
-      "tokens_entrada": 4681,
-      "tokens_salida": 200,
+      "segundos": 4.82,
+      "tokens_entrada": 4868,
+      "tokens_salida": 185,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "The answer correctly describes HyDE as a technique that generates a pseudo-document to capture the essence of a query, especially when the query is poorly expressed or lacks context, improving retrieval accuracy by helping retrieval systems find more relevant documents. It also mentions a trade-off in computational cost and cites [41]. The article fragments support this description by stating that retrieval fails with poorly expressed queries and that techniques like generating a pseudo-document (HyDE) can help bridge the gap.",
-      "juez_segundos": 3.38
+      "juez_motivo": "The answer correctly describes HyDE as a technique that generates a pseudo-document to capture the essence of a query, improving retrieval accuracy for poorly expressed queries, and acknowledges the tradeoff in computational cost. This is supported by the article fragment which mentions HyDE [41] as a technique that helps bridge the gap for unclear queries.",
+      "juez_segundos": 2.48
     },
     {
       "n": 17,
       "pregunta": "How does RAPTOR organize documents for retrieval?",
       "tipo": "término (en)",
-      "respuesta": "RAPTOR organizes documents into a hierarchical tree structure, where each node represents a summary of a section or subsection. The retrieval process is recursive: an initial query matches a high-level summary, and subsequent retrieval steps focus on the detailed text chunks that make up that summary, narrowing the search space at each level.",
+      "respuesta": "RAPTOR organizes documents into a hierarchical tree structure. Retrieval is performed recursively: an initial query matches a high-level summary, and subsequent retrieval steps focus on the detailed text chunks that compose that summary, narrowing the search space at each level.",
       "citas": [
         "huang2026-rag-survey-027"
       ],
@@ -453,14 +451,14 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 9.15,
-      "tokens_entrada": 8334,
-      "tokens_salida": 341,
+      "segundos": 7.18,
+      "tokens_entrada": 8712,
+      "tokens_salida": 327,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "The answer correctly describes RAPTOR as using a hierarchical tree structure with recursive retrieval, where initial queries match high-level summaries and subsequent steps focus on detailed text chunks. This aligns with the article's description of recursive retrieval strategy in RAPTOR.",
-      "juez_segundos": 2.52
+      "juez_motivo": "The answer correctly describes RAPTOR's hierarchical tree structure and recursive retrieval process, aligning with the article's description of recursive retrieval strategy and hierarchical organization.",
+      "juez_segundos": 1.79
     },
     {
       "n": 18,
@@ -468,8 +466,7 @@
       "tipo": "término (en)",
       "respuesta": "FILCO uses three strategies to filter context at the sentence level: string matching, lexical overlap, and a measure of how much the context improves output likelihood using cross-mutual information. It also trains a context filtering model with these strategies to predict the most useful context at inference time.",
       "citas": [
-        "huang2026-rag-survey-037",
-        "huang2026-rag-survey-036"
+        "huang2026-rag-survey-037"
       ],
       "fragmentos_correctos": [
         "huang2026-rag-survey-037"
@@ -478,20 +475,20 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 6.1,
-      "tokens_entrada": 4627,
-      "tokens_salida": 206,
+      "segundos": 4.77,
+      "tokens_entrada": 4980,
+      "tokens_salida": 188,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "The answer states that FILCO uses three strategies: string matching, lexical overlap, and a measure of how much the context improves output likelihood using cross-mutual information. It also mentions training a context filtering model with these strategies. The article fragment explicitly says: \"FILCO uses three different strategies to filter at the sentence level: string matching, lexical overlap, and a measure of how much the context improves output likelihood using cross-mutual information.\" This matches the answer exactly. The answer also correctly notes that FILCO trains a context filtering model with these strategies, which is supported by the fragment: \"FILCO also trains a context filtering model with these strategies to predict the most useful context at inference time.\" The answer is fully supported by the fragments.",
-      "juez_segundos": 4.89
+      "juez_motivo": "The answer states that FILCO uses three strategies: string matching, lexical overlap, and a measure of how much the context improves output likelihood using cross-mutual information. It also mentions training a context filtering model with these strategies. The article fragments confirm that FILCO uses three strategies: string matching, lexical overlap, and a measure of how much the context improves output likelihood using cross-mutual information, and that it trains a context filtering model with these strategies. The answer accurately reflects the article.",
+      "juez_segundos": 2.81
     },
     {
       "n": 19,
       "pregunta": "How does the Chain-of-Verification (CoVe) method work?",
       "tipo": "término (en)",
-      "respuesta": "The Chain-of-Verification (CoVe) method works by having the language model generate a draft response first, then formulate and answer questions to check its own claims against retrieved evidence before producing a final, corrected response. This iterative process allows the model to self-verify its output using feedback from the retrieval system.",
+      "respuesta": "The Chain-of-Verification (CoVe) method works by having the language model first generate a draft response, then formulate and answer questions to check its own claims against retrieved evidence before producing a final, corrected response. This iterative process allows the model to self-verify its output using feedback from retrieved information.",
       "citas": [
         "huang2026-rag-survey-040",
         "huang2026-rag-survey-033"
@@ -503,14 +500,14 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 6.41,
-      "tokens_entrada": 4866,
-      "tokens_salida": 215,
+      "segundos": 5.33,
+      "tokens_entrada": 5053,
+      "tokens_salida": 214,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
-      "juez_motivo": "The answer describes CoVe as generating a draft response, then formulating and answering questions to check claims against retrieved evidence before producing a final corrected response. This matches the article's description of CoVe in the self-correction section.",
-      "juez_segundos": 2.7
+      "juez_motivo": "The answer describes CoVe as generating a draft response, then formulating and answering questions to check claims against retrieved evidence before producing a final corrected response. This matches the article's description of CoVe in the second fragment, which states: 'This idea of self-verification is also central to the Chain-of-Verification (CoVe) method [33], where the model first generates a draft response, then formulates and answers questions to check its own claims against retrieved evidence before producing a final, corrected response.'",
+      "juez_segundos": 3.2
     },
     {
       "n": 20,
@@ -527,14 +524,14 @@
       "decision_correcta": true,
       "cita_correcta": true,
       "idioma_correcto": true,
-      "segundos": 5.84,
-      "tokens_entrada": 4915,
+      "segundos": 5.03,
+      "tokens_entrada": 5102,
       "tokens_salida": 188,
       "error": null,
       "juez_fiel": "si",
       "juez_relevancia": 5,
       "juez_motivo": "The answer correctly describes the SELF-ROUTE method as a dynamic strategy that first uses RAG and switches to full long context if needed, combining cost-saving benefits of RAG with full-context processing power.",
-      "juez_segundos": 2.16
+      "juez_segundos": 2.01
     },
     {
       "n": 21,
@@ -547,8 +544,8 @@
       "decision_correcta": true,
       "cita_correcta": null,
       "idioma_correcto": true,
-      "segundos": 4.27,
-      "tokens_entrada": 4596,
+      "segundos": 3.62,
+      "tokens_entrada": 4766,
       "tokens_salida": 116,
       "error": null
     },
@@ -556,18 +553,22 @@
       "n": 22,
       "pregunta": "¿Qué resultados obtiene GPT-7 en el benchmark MMLU según el artículo?",
       "tipo": "no responde",
-      "respuesta": "El artículo no proporciona los resultados de GPT-7 en el benchmark MMLU.",
+      "respuesta": "El artículo no menciona los resultados de GPT-7 en el benchmark MMLU.",
       "citas": [
-        "huang2026-rag-survey-065"
+        "huang2026-rag-survey-065",
+        "huang2026-rag-survey-003",
+        "huang2026-rag-survey-061",
+        "huang2026-rag-survey-060",
+        "huang2026-rag-survey-062"
       ],
       "fragmentos_correctos": [],
       "busco": true,
       "decision_correcta": false,
       "cita_correcta": null,
       "idioma_correcto": true,
-      "segundos": 6.7,
-      "tokens_entrada": 9549,
-      "tokens_salida": 201,
+      "segundos": 7.15,
+      "tokens_entrada": 5459,
+      "tokens_salida": 227,
       "error": null
     },
     {
@@ -581,9 +582,9 @@
       "decision_correcta": true,
       "cita_correcta": null,
       "idioma_correcto": true,
-      "segundos": 5.98,
-      "tokens_entrada": 8364,
-      "tokens_salida": 189,
+      "segundos": 5.41,
+      "tokens_entrada": 4888,
+      "tokens_salida": 217,
       "error": null
     },
     {
@@ -597,29 +598,31 @@
       "decision_correcta": true,
       "cita_correcta": null,
       "idioma_correcto": true,
-      "segundos": 4.5,
-      "tokens_entrada": 4498,
-      "tokens_salida": 132,
+      "segundos": 5.26,
+      "tokens_entrada": 4668,
+      "tokens_salida": 221,
       "error": null
     },
     {
       "n": 25,
       "pregunta": "¿Qué opinan los autores sobre las criptomonedas?",
       "tipo": "no responde",
-      "respuesta": "Los autores no expresan una opinión personal sobre las criptomonedas en el artículo.",
+      "respuesta": "Los autores no expresan opiniones sobre las criptomonedas en el artículo.",
       "citas": [
-        "huang2026-rag-survey-001",
         "huang2026-rag-survey-075",
-        "huang2026-rag-survey-074"
+        "huang2026-rag-survey-002",
+        "huang2026-rag-survey-001",
+        "huang2026-rag-survey-074",
+        "huang2026-rag-survey-041"
       ],
       "fragmentos_correctos": [],
       "busco": true,
       "decision_correcta": false,
       "cita_correcta": null,
       "idioma_correcto": true,
-      "segundos": 5.36,
-      "tokens_entrada": 4007,
-      "tokens_salida": 184,
+      "segundos": 5.16,
+      "tokens_entrada": 4177,
+      "tokens_salida": 220,
       "error": null
     }
   ]

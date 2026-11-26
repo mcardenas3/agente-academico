@@ -37,13 +37,18 @@ flowchart LR
     G -->|razona y llama tools| O[Ollama<br/>nemotron-3-nano:4b]
     G -->|vector de la pregunta| V[vLLM<br/>Nemotron-3-Embed-1B]
     G -->|búsqueda híbrida| S[(OpenSearch<br/>BM25 + k-NN)]
-    A -->|conversaciones, mensajes,<br/>métricas y citas| P[(PostgreSQL)]
-    A -->|caché de respuestas<br/>e historial reciente| R[(Redis)]
+    A -->|conversaciones, mensajes,<br/>métricas, citas y biblioteca| P[(PostgreSQL)]
+    A -->|caché, historial reciente<br/>y cola de artículos| R[(Redis)]
     H[Hugging Face Hub] -. pesos .-> V
-    subgraph ingesta [Ingesta · una sola vez]
+    subgraph ingesta [Ingesta del original · una sola vez]
         PDF[PDF] --> D[Docling] --> F[fragmentos.jsonl]
     end
     F -->|al arrancar, si falta| S
+    A -->|PDF subido desde /admin| VOL[(volumen<br/>archivos)]
+    R -->|cola| T[trabajador<br/>Docling en CPU]
+    VOL --> T
+    T -->|fragmentos + vectores| S
+    T -->|estado y avance| P
 ```
 
 Recorrido de una pregunta:
@@ -61,13 +66,40 @@ Recorrido de una pregunta:
    la búsqueda no le dio.
 6. La API convierte los fragmentos citados en sección y páginas, guarda todo en PostgreSQL y
    manda la respuesta por SSE. Mientras tanto, la interfaz muestra en vivo qué se está buscando.
-7. Cada cita es un enlace que abre el PDF del artículo (`/articulo.pdf#page=N`) en la página del
-   texto citado. Con «Ver el texto citado» se despliega el texto exacto de cada fragmento en que se
-   basó la respuesta (`GET /api/fragmentos`), para comparar la respuesta con su fuente.
+7. Cada cita es un enlace que abre el PDF de su artículo (`/articulos/{id}.pdf#page=N`) en la
+   página del texto citado. Con «Ver el texto citado» se despliega el texto exacto de cada
+   fragmento en que se basó la respuesta (`GET /api/fragmentos`), para comparar la respuesta con su
+   fuente.
 
 **Historial sin login.** Cada navegador recibe un id aleatorio (en su `localStorage`) y la barra
 lateral muestra solo sus conversaciones, tituladas con la primera pregunta. Quitar una del
 historial la marca como `oculta`: sus mensajes y métricas se conservan para `/admin`.
+
+### Biblioteca: varios artículos
+
+Desde el panel `/admin`, con el token, se suben más artículos en PDF (hasta 25 MB y 80 páginas).
+Quedan guardados para siempre en una biblioteca común, hasta que se quiten desde el mismo panel.
+
+1. La API guarda el PDF en un volumen de Docker y lo registra en PostgreSQL como `en_cola`.
+2. Mete su id en una **cola de Redis**.
+3. El servicio **trabajador**, en su propio contenedor con Docling y PyTorch para CPU, lo saca de la
+   cola y hace la misma ingesta que el artículo original:
+   - conversión con Docling;
+   - limpieza genérica;
+   - fragmentos de 512 tokens;
+   - vectores con vLLM;
+   - indexado en OpenSearch con su `articulo_id`.
+4. El panel muestra el avance en vivo («página 4 de 12», «Vectorizando 40 fragmentos»). Un PDF de
+   6 páginas tardó unos 60 s.
+
+En el chat, al empezar una conversación se elige un artículo o **«Todos los artículos»**. La
+búsqueda filtra por `articulo_id`, cada artículo tiene su propia bibliografía y, con «Todos», cada
+cita dice de qué artículo sale.
+
+Lo que **no** se aplica a los artículos subidos:
+- La limpieza a la medida del original (Tabla 3, algoritmos, subsecciones en línea). Solo se aplica
+  la genérica: NFKC, números de página, párrafos partidos y niveles de título.
+- OCR: un PDF escaneado no tiene texto y el panel lo marca como error.
 
 ### Rol de cada componente
 
@@ -79,10 +111,10 @@ historial la marca como `oculta`: sus mensajes y métricas se conservan para `/a
 | **Ollama** 0.40 | Sirve el LLM `nemotron-3-nano:4b`, que razona, llama tools y redacta |
 | **OpenSearch** 3.9 | Índice con k-NN (HNSW, Faiss, producto punto) y BM25 (analizador `english`) en los mismos documentos |
 | **Pydantic AI** 2.75 | El agente: tools, salida tipada, validación con reintentos y memoria de la conversación |
-| **PostgreSQL** 17 | Conversaciones, mensajes, métricas y citas (esquema normalizado) |
-| **Redis** 7 | Caché de respuestas e historial reciente de cada conversación |
+| **PostgreSQL** 17 | Conversaciones, mensajes, métricas, citas y la biblioteca de artículos (esquema normalizado) |
+| **Redis** 7 | Caché de respuestas, historial reciente de cada conversación y cola de artículos por procesar |
 | **React** 19 + Vite | Chat y panel `/admin` |
-| **Docker** | 8 servicios (uno solo descarga el LLM y termina) con healthchecks, volúmenes y variables en `.env` |
+| **Docker** | 9 servicios (uno solo descarga el LLM y termina; el trabajador procesa los PDFs subidos) con healthchecks, volúmenes y variables en `.env` |
 | **ngrok** | URL pública HTTPS para la demo |
 
 ---
@@ -98,7 +130,8 @@ docker compose up -d
 ```
 
 La primera vez, Docker descarga las imágenes y los modelos: el LLM son 2.8 GB y los embeddings
-2.3 GB. Después arma el índice a partir de `datos/procesado/fragmentos.jsonl`. Cuando `app` aparece
+2.3 GB. También construye la imagen del trabajador de la biblioteca, que pesa 2.7 GB por PyTorch y
+Docling, en unos 4 minutos. Después arma el índice a partir de `datos/procesado/fragmentos.jsonl`. Cuando `app` aparece
 como `healthy` en `docker compose ps`, todo está listo.
 
 | Variable de `.env` | Para qué |
@@ -281,9 +314,13 @@ cd api && uv run python ../evaluacion/evaluar_agente.py
 | Citó al menos un fragmento correcto (fijado de antemano) | **20/20** |
 | Respondió en el idioma de la pregunta | **25/25** |
 | Se abstuvo en las que el artículo no cubre | **3/5** |
-| LLM como juez: respuesta fiel a los fragmentos citados | 17/20 sí · 2 parcial · 1 no |
-| LLM como juez: relevancia (1–5) | **4.9** |
-| Tiempo promedio por pregunta | 6.2 s |
+| LLM como juez: respuesta fiel a los fragmentos citados | **19/20** sí · 1 no |
+| LLM como juez: relevancia (1–5) | **4.95** |
+| Tiempo promedio por pregunta | 6.7 s |
+
+Estos números son de la versión con biblioteca, en la que el artículo va en una nota al final de
+la pregunta. La versión anterior, con el artículo fijo en las instrucciones, dio lo mismo en los
+criterios automáticos y 17/20 en fidelidad: el cambio no empeoró nada.
 
 - En las 2 abstenciones fallidas, el agente sí dijo que el artículo no trata el tema («Los autores
   no expresan una opinión sobre las criptomonedas»), pero las marcó como respondibles.
@@ -303,18 +340,23 @@ erDiagram
     conversaciones ||--o{ mensajes : tiene
     mensajes ||--o| metricas : "si es del agente"
     mensajes ||--o{ citas : "si es del agente"
-    conversaciones { uuid id PK  timestamptz creada_en  uuid cliente_id  text titulo  timestamptz actualizada_en  bool oculta }
+    articulos |o..o{ conversaciones : "articulo_id (NULL = todos)"
+    conversaciones { uuid id PK  timestamptz creada_en  uuid cliente_id  text titulo  timestamptz actualizada_en  bool oculta  text articulo_id }
+    articulos { text id PK  text titulo  text archivo  bool original  text estado  text progreso  text error  int paginas  int fragmentos  timestamptz subido_en  timestamptz procesado_en }
     mensajes { bigint id PK  uuid conversacion_id FK  text rol  text contenido  timestamptz creado_en }
     metricas { bigint mensaje_id PK  text modelo  int tokens_entrada  int tokens_salida  int llamadas_llm  real segundos_total  real segundos_busqueda  bool se_puede_responder  bool desde_cache  text consulta_en  text_arr tools  text error }
     citas { bigint id PK  bigint mensaje_id FK  text fragmento_id  text seccion  int_arr paginas }
 ```
 
-**Redis** tiene dos usos:
+**Redis** tiene tres usos:
 - **Caché de respuestas.** Solo para preguntas que abren una conversación: las de seguimiento
-  dependen de lo anterior. La llave es la pregunta normalizada más el modelo, y dura 24 h.
+  dependen de lo anterior. La llave es la pregunta normalizada más el modelo y el artículo elegido,
+  y dura 24 h. Se borra cuando la biblioteca cambia.
   **Efecto medido:** 2 ms con la caché contra 7.4 s sin ella. El panel lo muestra en vivo.
 - **Historial reciente** de cada conversación (los últimos 3 turnos), para no consultar PostgreSQL
   en cada pregunta.
+- **Cola de tareas** (`cola:articulos`): la API agrega y el trabajador saca, uno a la vez. Si el
+  trabajador se reinicia, al arrancar vuelve a encolar lo que quedó pendiente.
 
 ---
 
@@ -328,7 +370,8 @@ Protegido con `Authorization: Bearer <ADMIN_TOKEN>`. Lee todo de PostgreSQL:
 - preguntas fuera del artículo y errores;
 - una gráfica por día;
 - la lista de preguntas y respuestas, con buscador, filtro de fechas y el detalle de cada una
-  (modelo, llamadas al LLM, tools, consulta a BM25).
+  (modelo, llamadas al LLM, tools, consulta a BM25);
+- la **biblioteca**: subir PDFs, ver el avance de cada uno y quitar los que se subieron.
 
 ---
 
@@ -337,7 +380,7 @@ Protegido con `Authorization: Bearer <ADMIN_TOKEN>`. Lee todo de PostgreSQL:
 ```
 api/            agente (Pydantic AI), búsqueda, API de FastAPI, esquema SQL, caché
 web/            interfaz en React (chat y /admin)
-ingesta/        PDF → fragmentos con Docling, creación del índice
+ingesta/        PDF → fragmentos con Docling, creación del índice y el trabajador de la biblioteca
 evaluacion/     evaluación del agente (25 preguntas + LLM como juez) y sus resultados
 experimentos/   experimentos que respaldan cada decisión (tablas, fragmentos, búsqueda, agente)
 datos/          el artículo, los fragmentos y las traducciones de la evaluación
@@ -354,3 +397,5 @@ pruebas/        peticiones de prueba para Ollama (tool calling) y vLLM (un embed
   transmite en vivo es el progreso: qué buscó y cuándo está redactando.
 - El juez es el mismo modelo que responde. Un juez más grande sería más confiable, pero no cabe en
   esta GPU.
+- Los artículos subidos pasan solo por la limpieza genérica y sin OCR. Docling corre en CPU, así
+  que procesa un artículo a la vez: unos minutos por cada uno.

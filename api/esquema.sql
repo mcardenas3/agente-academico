@@ -25,6 +25,33 @@ COMMENT ON COLUMN conversaciones.oculta IS 'Quitada del historial; sus mensajes 
 CREATE INDEX IF NOT EXISTS conversaciones_por_cliente
     ON conversaciones (cliente_id, actualizada_en DESC) WHERE NOT oculta;
 
+-- Biblioteca de artículos: el original y los que se suben desde /admin. Un artículo subido pasa por
+-- en_cola → procesando → listo (o error); lo procesa el servicio "trabajador" (ingesta/trabajador.py)
+CREATE TABLE IF NOT EXISTS articulos (
+    id            TEXT PRIMARY KEY,                 -- prefijo de los ids de sus fragmentos
+    titulo        TEXT NOT NULL,
+    archivo       TEXT NOT NULL,                    -- nombre del PDF guardado
+    original      BOOLEAN NOT NULL DEFAULT false,   -- el survey del proyecto: no se puede borrar
+    estado        TEXT NOT NULL CHECK (estado IN ('en_cola', 'procesando', 'listo', 'error')),
+    progreso      TEXT,                             -- lo que está haciendo el trabajador ahora
+    error         TEXT,
+    paginas       INTEGER,
+    fragmentos    INTEGER,
+    subido_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    procesado_en  TIMESTAMPTZ
+);
+COMMENT ON TABLE articulos IS 'Artículos que el agente puede consultar; sus fragmentos viven en OpenSearch';
+INSERT INTO articulos (id, titulo, archivo, original, estado, paginas, fragmentos, procesado_en)
+VALUES ('huang2026-rag-survey',
+        'A Survey on Retrieval-Augmented Text Generation for Large Language Models',
+        'huang2026-rag-survey.pdf', true, 'listo', 38, 268, now())
+ON CONFLICT (id) DO NOTHING;
+
+-- Artículo sobre el que pregunta cada conversación; NULL = todos los de la biblioteca. Sin FK a
+-- propósito: borrar un artículo no debe borrar las conversaciones que lo usaron
+ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS articulo_id TEXT;
+COMMENT ON COLUMN conversaciones.articulo_id IS 'Artículo elegido al empezar; NULL = todos';
+
 CREATE TABLE IF NOT EXISTS mensajes (
     id               BIGSERIAL PRIMARY KEY,
     conversacion_id  UUID NOT NULL REFERENCES conversaciones (id) ON DELETE CASCADE,

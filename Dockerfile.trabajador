@@ -1,0 +1,14 @@
+# Imagen del trabajador: procesa con Docling los artículos que se suben desde /admin.
+# Va aparte de la API porque Docling y PyTorch pesan ~1.5 GB y la API no los necesita.
+FROM python:3.13-slim
+
+ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1
+# PyTorch para CPU: el de PyPI para Linux trae CUDA (varios GB) y aquí Docling corre en CPU
+RUN pip install torch==2.15.0 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cpu
+# Mismas versiones que el proyecto de ingesta (ingesta/uv.lock), más los clientes de la cola
+RUN pip install docling==2.152.0 opensearch-py==3.2.0 httpx==0.28.1 "psycopg[binary]==3.3.9" redis==8.2.0
+
+WORKDIR /app/ingesta
+COPY ingesta/convertir.py ingesta/limpiar.py ingesta/fragmentar.py ingesta/indexar.py \
+     ingesta/crear_indice.py ingesta/trabajador.py ./
+CMD ["python", "trabajador.py"]

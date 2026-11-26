@@ -1,6 +1,6 @@
 // Cómo habla la interfaz con la API de FastAPI
 
-export type Cita = { id: string; seccion: string; paginas: number[] }
+export type Cita = { id: string; seccion: string; paginas: number[]; articulo_id?: string | null }
 
 export type Respuesta = {
   respuesta: string
@@ -44,7 +44,25 @@ export function clienteId(): string {
   }
 }
 
-export type ConversacionResumen = { id: string; titulo: string | null; actualizada_en: string; preguntas: number }
+export type ConversacionResumen = {
+  id: string; titulo: string | null; actualizada_en: string; preguntas: number; articulo_id: string | null
+}
+
+// --- Biblioteca de artículos ---
+
+export type Articulo = { id: string; titulo: string; original: boolean; paginas: number | null; fragmentos: number | null }
+
+export async function listarArticulos(): Promise<Articulo[]> {
+  const res = await fetch('/api/articulos')
+  return res.ok ? res.json() : []
+}
+
+/** De qué artículo es un fragmento: su id sin el número final ("huang2026-rag-survey-034"). */
+export const articuloDe = (idFragmento: string) => idFragmento.replace(/-\d{3,}$/, '')
+
+/** El PDF de un artículo abierto en una página. */
+export const urlPdf = (articuloId: string, pagina?: number) =>
+  `/articulos/${articuloId}.pdf${pagina ? `#page=${pagina}` : ''}`
 
 export async function listarConversaciones(): Promise<ConversacionResumen[]> {
   const res = await fetch(`/api/conversaciones?cliente_id=${clienteId()}`)
@@ -58,20 +76,22 @@ export async function ocultarConversacion(id: string): Promise<boolean> {
 }
 
 type Manejadores = {
-  conversacion: (id: string) => void
+  conversacion: (id: string, articuloId: string | null) => void
   buscando: (consulta: string) => void
   respuesta: (r: Respuesta) => void
   error: (mensaje: string) => void
 }
 
-/** Manda la pregunta y va llamando a los manejadores conforme llegan los eventos SSE. */
-export async function preguntar(pregunta: string, conversacionId: string | null, m: Manejadores) {
+/** Manda la pregunta y va llamando a los manejadores conforme llegan los eventos SSE.
+ * articuloId solo cuenta al empezar una conversación (null = todos los artículos). */
+export async function preguntar(pregunta: string, conversacionId: string | null, articuloId: string | null,
+  m: Manejadores) {
   let res: Response
   try {
     res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pregunta, conversacion_id: conversacionId, cliente_id: clienteId() }),
+      body: JSON.stringify({ pregunta, conversacion_id: conversacionId, cliente_id: clienteId(), articulo_id: articuloId }),
     })
   } catch {
     m.error('No hay conexión con el servidor.')
@@ -100,7 +120,7 @@ export async function preguntar(pregunta: string, conversacionId: string | null,
       }
       if (!datos) continue
       const d = JSON.parse(datos)
-      if (evento === 'conversacion') m.conversacion(d.id)
+      if (evento === 'conversacion') m.conversacion(d.id, d.articulo_id ?? null)
       else if (evento === 'buscando') m.buscando(d.argumentos?.consulta_en ?? '')
       else if (evento === 'respuesta') { m.respuesta(d); terminado = true }
       else if (evento === 'error') { m.error(d.mensaje); terminado = true }
@@ -109,7 +129,7 @@ export async function preguntar(pregunta: string, conversacionId: string | null,
   if (!terminado) m.error('La conexión se cortó antes de terminar.')
 }
 
-export type Fragmento = { id: string; seccion: string; paginas: number[]; texto: string }
+export type Fragmento = { id: string; seccion: string; paginas: number[]; texto: string; articulo_id: string; articulo: string }
 
 /** El texto exacto de los fragmentos citados, en el mismo orden. */
 export async function cargarFragmentos(ids: string[]): Promise<Fragmento[]> {
@@ -164,6 +184,31 @@ export type FilaPregunta = {
 }
 
 export class NoAutorizado extends Error {}
+
+export type ArticuloAdmin = Articulo & {
+  estado: 'en_cola' | 'procesando' | 'listo' | 'error'
+  progreso: string | null
+  error: string | null
+  subido_en: string
+  procesado_en: string | null
+}
+
+/** Sube un PDF a la biblioteca; el trabajador lo procesa en segundo plano. */
+export async function subirArticulo(token: string, archivo: File, titulo: string): Promise<ArticuloAdmin> {
+  const datos = new FormData()
+  datos.append('archivo', archivo)
+  if (titulo.trim()) datos.append('titulo', titulo.trim())
+  const res = await fetch('/api/admin/articulos', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: datos })
+  if (res.status === 401) throw new NoAutorizado('Token incorrecto')
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Error ${res.status}`)
+  return res.json()
+}
+
+export async function borrarArticulo(token: string, id: string): Promise<void> {
+  const res = await fetch(`/api/admin/articulos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) throw new NoAutorizado('Token incorrecto')
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Error ${res.status}`)
+}
 
 export async function admin<T>(ruta: string, token: string, parametros: Record<string, string | number | undefined>): Promise<T> {
   const qs = new URLSearchParams()

@@ -35,22 +35,31 @@ def _normalizar(pregunta: str) -> str:
     return texto.rstrip("?¿!. ").lstrip("¿¡ ")
 
 
-def llave_respuesta(pregunta: str) -> str:
-    """La llave incluye el modelo: si cambia el LLM, las respuestas viejas no se reusan."""
-    resumen = hashlib.sha256(f"{MODELO_LLM}|{_normalizar(pregunta)}".encode()).hexdigest()[:32]
-    return f"respuesta:{resumen}"
+def llave_respuesta(pregunta: str, articulo_id: str | None) -> str:
+    """La llave incluye el modelo (si cambia el LLM, las respuestas viejas no se reusan) y el
+    artículo elegido: la misma pregunta a otro artículo es otra respuesta."""
+    clave = f"{MODELO_LLM}|{articulo_id or '*'}|{_normalizar(pregunta)}"
+    return f"respuesta:{hashlib.sha256(clave.encode()).hexdigest()[:32]}"
 
 
-async def leer_respuesta(redis: Redis, pregunta: str) -> RespuestaCitada | None:
-    guardada = await redis.get(llave_respuesta(pregunta))
+async def leer_respuesta(redis: Redis, pregunta: str, articulo_id: str | None
+                         ) -> RespuestaCitada | None:
+    guardada = await redis.get(llave_respuesta(pregunta, articulo_id))
     return RespuestaCitada.model_validate_json(guardada) if guardada else None
 
 
-async def guardar_respuesta(redis: Redis, pregunta: str, respuesta: RespuestaCitada) -> None:
+async def guardar_respuesta(redis: Redis, pregunta: str, articulo_id: str | None,
+                            respuesta: RespuestaCitada) -> None:
     # Solo respuestas sanas: un error no se cachea, para que la siguiente vez se intente otra vez
     if respuesta.error is None:
-        await redis.set(llave_respuesta(pregunta), respuesta.model_dump_json(),
+        await redis.set(llave_respuesta(pregunta, articulo_id), respuesta.model_dump_json(),
                         ex=DURACION_RESPUESTA)
+
+
+async def olvidar_respuestas(redis: Redis) -> None:
+    """Borra todas las respuestas guardadas: al quitar un artículo, las de "todos" pueden citarlo."""
+    async for llave in redis.scan_iter("respuesta:*"):
+        await redis.delete(llave)
 
 
 def _llave_historial(conversacion_id: uuid.UUID) -> str:

@@ -45,14 +45,13 @@ TURNOS_DE_MEMORIA = 3
 # inglés; la respuesta sí sale en el idioma de la pregunta (regla 6). La frase de la terminología
 # viene de la Etapa 4: sin ella, "recuperación" se traducía "recovery"
 INSTRUCCIONES = """\
-You answer questions about one scientific article: "A Survey on Retrieval-Augmented Text \
-Generation for Large Language Models" (Huang and Huang, ACM Computing Surveys, 2026).
+You answer questions about scientific articles from a library. The note at the end of the user's \
+message says which article (or articles) to use.
 
 Rules:
 1. ALWAYS call buscar_en_articulo before answering, even if you think you know the answer. Pass \
-the user's question as `consulta` and its English translation as `consulta_en`. The questions are \
-about information retrieval and retrieval-augmented generation (RAG), so use the standard English \
-terminology of that field.
+the user's question as `consulta` and its English translation as `consulta_en`. Use the standard \
+English terminology of the article's research field.
 2. If the question refers to earlier messages of the conversation (for example "and how does it \
 compare?"), rewrite it as a self-contained question in both `consulta` and `consulta_en`.
 3. Answer ONLY with information from the fragments returned by the tools. Do not add facts from \
@@ -74,6 +73,13 @@ NO_CUBRE = {
     "es": "El artículo no trata este tema, así que no puedo responderlo con base en él.",
     "en": "The article does not cover this topic, so I can't answer it based on the article.",
 }
+# Lo mismo cuando se pregunta a varios artículos a la vez
+NO_CUBREN = {
+    "es": "Los artículos de la biblioteca no tratan este tema, así que no puedo responderlo.",
+    "en": "The articles in the library do not cover this topic, so I can't answer it.",
+}
+# Cuántos títulos caben en la nota de la pregunta cuando se busca en todos los artículos
+MAX_TITULOS_EN_NOTA = 8
 
 # Palabras frecuentes de cada idioma para adivinar en cuál viene la pregunta
 _PALABRAS_ES = {"que", "qué", "como", "cómo", "cual", "cuál", "cuales", "cuáles", "el", "la", "los",
@@ -88,9 +94,19 @@ _PALABRAS_EN = {"what", "how", "the", "is", "are", "of", "which", "why", "does",
 NOTA_DE_IDIOMA = {"es": "(Responde en español.)", "en": "(Answer in English.)"}
 
 
-def con_nota_de_idioma(pregunta: str) -> str:
-    """La pregunta tal cual, más la nota del idioma en que debe responder."""
-    return f"{pregunta}\n\n{NOTA_DE_IDIOMA[idioma_de(pregunta)]}"
+def con_nota(pregunta: str, titulos: list[str]) -> str:
+    """La pregunta tal cual, más una nota con el artículo (o los artículos) a usar y el idioma.
+
+    El título va en la nota y no en las instrucciones por lo mismo que el idioma: las instrucciones
+    dinámicas rompían el tool calling. Además le dice al modelo el campo del artículo, que es lo
+    que necesita para traducir bien al inglés ("recuperación" → "retrieval", no "recovery").
+    """
+    if len(titulos) == 1:
+        articulos = f"Article: «{titulos[0]}»."
+    else:
+        lista = "; ".join(f"«{t}»" for t in titulos[:MAX_TITULOS_EN_NOTA])
+        articulos = f"Search all the articles in the library: {lista}."
+    return f"{pregunta}\n\n({articulos})\n{NOTA_DE_IDIOMA[idioma_de(pregunta)]}"
 
 
 def idioma_de(texto: str) -> str:
@@ -107,6 +123,8 @@ class Dependencias:
     """Lo que las tools necesitan durante una pregunta. Pydantic AI se lo pasa en ctx.deps."""
 
     cliente: OpenSearch
+    # Artículos donde se busca; None = todos los de la biblioteca
+    articulos: list[str] | None = None
     # Fragmentos que devolvió la búsqueda en esta pregunta, por id: de aquí salen las citas
     fragmentos_vistos: dict[str, Fragmento] = field(default_factory=dict)
     # Tiempo dentro de las tools (vectorizar + buscar), para separar búsqueda de LLM en /admin
@@ -137,6 +155,7 @@ class Cita(BaseModel):
     id: str
     seccion: str
     paginas: list[int]
+    articulo_id: str | None = None  # de qué artículo; las respuestas viejas en caché no lo traen
 
 
 class Turno(BaseModel):
@@ -192,7 +211,7 @@ agente = Agent(
 
 # Nota: se probó agregar una instrucción calculada en código con el idioma de la pregunta
 # (@agente.instructions). Con cualquier instrucción dinámica el modelo dejó de llamar la búsqueda
-# (0 de 9 preguntas, contra 3 de 3 sin ella); el idioma va en la pregunta (NOTA_DE_IDIOMA)
+# (0 de 9 preguntas, contra 3 de 3 sin ella); el idioma y el artículo van en la pregunta (con_nota)
 
 
 # Un nombre seguido de su número de cita, como en las tablas: "REALM [48]", "Self-RAG [7]"
@@ -201,17 +220,22 @@ _NOMBRE_CON_CITA = re.compile(r"([A-Za-z][\w\-\.]{2,})\s*\[(\d+)\]")
 MAX_REFERENCIAS_MENCIONADAS = 3
 
 
-def citas_mencionadas(fragmentos: list[Fragmento], consulta_en: str) -> list[int]:
-    """Números de cita de los estudios que la pregunta nombra: si la pregunta dice "REALM" y un
-    fragmento dice "REALM [48]", devuelve [48]. Así la ficha llega sin depender de que el modelo
-    la pida (medido: con la regla escrita, nunca pedía traer_referencias_bibliograficas)."""
+def citas_mencionadas(fragmentos: list[Fragmento], consulta_en: str) -> dict[str, list[int]]:
+    """Números de cita de los estudios que la pregunta nombra, por artículo: si la pregunta dice
+    "REALM" y un fragmento dice "REALM [48]", devuelve {artículo: [48]}. Así la ficha llega sin
+    depender de que el modelo la pida (medido: con la regla escrita, nunca pedía
+    traer_referencias_bibliograficas). Va por artículo porque cada uno numera su bibliografía."""
     palabras = set(re.findall(r"[\w\-\.]+", consulta_en.lower()))
-    numeros: list[int] = []
+    por_articulo: dict[str, list[int]] = {}
+    total = 0
     for f in fragmentos:
         for nombre, numero in _NOMBRE_CON_CITA.findall(f.texto):
-            if nombre.lower() in palabras and int(numero) not in numeros:
+            numeros = por_articulo.setdefault(f.articulo_id, [])
+            if nombre.lower() in palabras and int(numero) not in numeros and \
+                    total < MAX_REFERENCIAS_MENCIONADAS:
                 numeros.append(int(numero))
-    return numeros[:MAX_REFERENCIAS_MENCIONADAS]
+                total += 1
+    return {a: n for a, n in por_articulo.items() if n}
 
 
 @agente.tool
@@ -225,9 +249,9 @@ def buscar_en_articulo(ctx: RunContext[Dependencias], consulta: str, consulta_en
         consulta_en: The same question translated into English.
     """
     inicio = time.perf_counter()
-    fragmentos = buscar_fragmentos(ctx.deps.cliente, consulta, consulta_en)
-    numeros = citas_mencionadas(fragmentos, consulta_en)
-    referencias = traer_referencias(ctx.deps.cliente, numeros).referencias if numeros else []
+    fragmentos = buscar_fragmentos(ctx.deps.cliente, consulta, consulta_en, ctx.deps.articulos)
+    referencias = [r for articulo, numeros in citas_mencionadas(fragmentos, consulta_en).items()
+                   for r in traer_referencias(ctx.deps.cliente, numeros, articulo).referencias]
     ctx.deps.segundos_busqueda += time.perf_counter() - inicio
     # Se guardan para convertir después los ids citados en sección y páginas
     for f in fragmentos:
@@ -243,8 +267,15 @@ def traer_referencias_bibliograficas(ctx: RunContext[Dependencias], numeros: lis
     Args:
         numeros: The citation numbers, e.g. [48] or [48, 82].
     """
+    # La bibliografía es la del artículo elegido; con todos, la del artículo que ya se consultó
+    if ctx.deps.articulos and len(ctx.deps.articulos) == 1:
+        articulo = ctx.deps.articulos[0]
+    elif ctx.deps.fragmentos_vistos:
+        articulo = next(iter(ctx.deps.fragmentos_vistos.values())).articulo_id
+    else:
+        raise ModelRetry("Call buscar_en_articulo first.")
     try:
-        return traer_referencias(ctx.deps.cliente, numeros)
+        return traer_referencias(ctx.deps.cliente, numeros, articulo)
     except ValueError as error:
         # Pedido inválido (vacío o demasiados): se le explica al modelo para que lo corrija
         raise ModelRetry(str(error)) from error
@@ -298,12 +329,15 @@ def historial_para_el_agente(turnos: list[Turno]) -> list[ModelMessage]:
 
 
 # Ids de fragmentos que el modelo a veces copia dentro del texto: "[huang2026-rag-survey-013, …]"
-_IDS_EN_TEXTO = re.compile(r"\s*\[?huang2026-rag-survey-\d+(?:,\s*huang2026-rag-survey-\d+)*\]?")
+_ID = r"[a-z0-9][a-z0-9-]*-\d{3,}"
+_IDS_EN_TEXTO = re.compile(rf"\s*\[?{_ID}(?:,\s*{_ID})*\]?")
+# Título del artículo original: lo que usa preguntar() si no se le dice otro artículo
+TITULO_ORIGINAL = "A Survey on Retrieval-Augmented Text Generation for Large Language Models"
 
 
 def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[ModelMessage],
                      uso, dependencias: Dependencias, segundos: float,
-                     error: str | None = None) -> RespuestaCitada:
+                     error: str | None = None, varios: bool = False) -> RespuestaCitada:
     """Junta la salida del modelo, las citas reales y las métricas en un RespuestaCitada."""
     vistos = dependencias.fragmentos_vistos
     llamadas = [p for m in mensajes for p in m.parts if p.part_kind == "tool-call"]
@@ -313,11 +347,12 @@ def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[Mod
 
     if salida is None or not salida.se_puede_responder:
         # Sin respuesta válida o fuera del artículo: mensaje fijo y sin citas
-        texto, se_puede, citas = NO_CUBRE[idioma_de(pregunta)], False, []
+        texto, se_puede, citas = (NO_CUBREN if varios else NO_CUBRE)[idioma_de(pregunta)], False, []
     else:
         # Las citas se muestran aparte; los ids dentro del texto sobran
         texto, se_puede = _IDS_EN_TEXTO.sub("", salida.respuesta).strip(), True
-        citas = [Cita(id=i, seccion=vistos[i].seccion, paginas=vistos[i].paginas)
+        citas = [Cita(id=i, seccion=vistos[i].seccion, paginas=vistos[i].paginas,
+                      articulo_id=vistos[i].articulo_id)
                  for i in dict.fromkeys(salida.fragmentos_citados) if i in vistos]
     return RespuestaCitada(
         respuesta=texto, se_puede_responder=se_puede, citas=citas,
@@ -332,20 +367,28 @@ def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[Mod
     )
 
 
-def preguntar(cliente: OpenSearch, pregunta: str, turnos: list[Turno] | None = None
+def preguntar(cliente: OpenSearch, pregunta: str, turnos: list[Turno] | None = None,
+              articulos: list[str] | None = None, titulos: list[str] | None = None
               ) -> RespuestaCitada:
-    """Hace una pregunta al agente (con los turnos anteriores) y devuelve la respuesta citada."""
-    dependencias = Dependencias(cliente=cliente)
+    """Hace una pregunta al agente (con los turnos anteriores) y devuelve la respuesta citada.
+
+    articulos: ids donde buscar (None = todos); titulos: los que van en la nota de la pregunta.
+    Sin ellos, pregunta sobre el artículo original, como en la evaluación.
+    """
+    titulos = titulos or [TITULO_ORIGINAL]
+    dependencias = Dependencias(cliente=cliente, articulos=articulos)
     inicio = time.perf_counter()
+    varios = len(titulos) > 1
     try:
-        resultado = agente.run_sync(con_nota_de_idioma(pregunta), deps=dependencias,
+        resultado = agente.run_sync(con_nota(pregunta, titulos), deps=dependencias,
                                     message_history=historial_para_el_agente(turnos or []))
     except UnexpectedModelBehavior as error:
         # Se agotaron los reintentos: se responde con el mensaje fijo y se guarda el motivo
         return _armar_respuesta(pregunta, None, [], None, dependencias,
-                                time.perf_counter() - inicio, error=str(error))
+                                time.perf_counter() - inicio, error=str(error), varios=varios)
     return _armar_respuesta(pregunta, resultado.output, resultado.new_messages(),
-                            resultado.usage, dependencias, time.perf_counter() - inicio)
+                            resultado.usage, dependencias, time.perf_counter() - inicio,
+                            varios=varios)
 
 
 # --- Versión con eventos, para que la API los mande al navegador mientras ocurren ---
@@ -359,14 +402,17 @@ class Evento:
 
 
 async def preguntar_por_eventos(cliente: OpenSearch, pregunta: str,
-                                turnos: list[Turno] | None = None) -> AsyncIterator[Evento]:
+                                turnos: list[Turno] | None = None,
+                                articulos: list[str] | None = None,
+                                titulos: list[str] | None = None) -> AsyncIterator[Evento]:
     """Igual que preguntar(), pero va avisando: cuándo busca, qué encontró y, al final, la
     respuesta completa. La API los convierte en eventos SSE para la interfaz."""
-    dependencias = Dependencias(cliente=cliente)
+    titulos = titulos or [TITULO_ORIGINAL]
+    dependencias = Dependencias(cliente=cliente, articulos=articulos)
     inicio = time.perf_counter()
     salida, mensajes, uso, error = None, [], None, None
     try:
-        async with agente.iter(con_nota_de_idioma(pregunta), deps=dependencias,
+        async with agente.iter(con_nota(pregunta, titulos), deps=dependencias,
                                message_history=historial_para_el_agente(turnos or [])) as corrida:
             async for nodo in corrida:
                 # Cada vuelta con tools: se avisa qué pidió el modelo y qué encontró
@@ -381,5 +427,6 @@ async def preguntar_por_eventos(cliente: OpenSearch, pregunta: str,
     except UnexpectedModelBehavior as e:
         error = str(e)
     respuesta = _armar_respuesta(pregunta, salida, mensajes, uso, dependencias,
-                                 time.perf_counter() - inicio, error=error)
+                                 time.perf_counter() - inicio, error=error,
+                                 varios=len(titulos) > 1)
     yield Evento("final", respuesta.model_dump())
