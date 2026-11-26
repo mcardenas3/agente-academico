@@ -1,11 +1,14 @@
-"""Búsqueda híbrida sobre los fragmentos del artículo: la que usará la tool del agente.
+"""Búsquedas sobre el artículo que usarán las tools del agente.
 
-Implementa la configuración que ganó en la Etapa 4 (MM30f):
-- BM25 con la pregunta en inglés (el artículo está en inglés y BM25 compara palabras);
-- vector con la pregunta original (el modelo de embeddings entiende español e inglés);
-- las dos listas se juntan con min_max y pesos 0.3 (BM25) / 0.7 (vector);
-- solo fragmentos de contenido (sin las 193 entradas de la bibliografía);
-- se le pasan K = 5 fragmentos al LLM.
+1. Búsqueda híbrida, la configuración que ganó en la Etapa 4 (MM30f):
+   - BM25 con la pregunta en inglés (el artículo está en inglés y BM25 compara palabras);
+   - vector con la pregunta original (el modelo de embeddings entiende español e inglés);
+   - las dos listas se juntan con min_max y pesos 0.3 (BM25) / 0.7 (vector);
+   - solo fragmentos de contenido (sin las 193 entradas de la bibliografía);
+   - se le pasan K = 5 fragmentos al LLM.
+2. Fichas de la bibliografía por su número de cita ("[48]"), porque la búsqueda deja fuera las
+   referencias y una ficha no siempre trae el nombre corto del método (la [48] es REALM y no dice
+   "REALM").
 """
 
 import httpx
@@ -104,3 +107,60 @@ def buscar_con_vector(cliente: OpenSearch, pregunta_en: str, vector: list[float]
 def buscar_fragmentos(cliente: OpenSearch, pregunta: str, pregunta_en: str) -> list[Fragmento]:
     """Lo que hará la tool: vectoriza la pregunta original y busca con las dos versiones."""
     return buscar_con_vector(cliente, pregunta_en, vectorizar(pregunta))
+
+
+# --- Fichas de la bibliografía ---
+
+# Cuántas fichas se pueden pedir de una vez: alcanza para citas como "[48, 82, 101]" y evita que
+# el LLM pida media bibliografía y se llene su contexto
+MAX_REFERENCIAS = 10
+
+
+class Referencia(BaseModel):
+    """Una ficha de la bibliografía del artículo."""
+
+    numero: int          # 48, el que aparece en el texto como "[48]"
+    texto: str           # autores, año, título y dónde se publicó
+    paginas: list[int]   # página del artículo donde está la ficha
+
+
+class ResultadoReferencias(BaseModel):
+    """Las fichas encontradas y los números que no existen en la bibliografía."""
+
+    referencias: list[Referencia]
+    no_encontradas: list[int]  # así el agente sabe que el número estaba mal, en vez de inventar
+
+
+def traer_referencias(cliente: OpenSearch, numeros: list[int]) -> ResultadoReferencias:
+    """Trae las fichas de la bibliografía con esos números de cita, en el orden pedido."""
+    # Sin repetidos y conservando el orden: dict.fromkeys guarda la primera aparición de cada uno
+    numeros = list(dict.fromkeys(numeros))
+    if not numeros:
+        raise ValueError("Hay que pedir al menos un número de referencia.")
+    if len(numeros) > MAX_REFERENCIAS:
+        raise ValueError(f"Se pueden pedir hasta {MAX_REFERENCIAS} referencias a la vez.")
+
+    # Búsqueda exacta, no por parecido: "terms" pide los documentos cuyo numero_referencia esté
+    # en la lista. Va en "filter" porque no hace falta puntaje, solo saber si coincide
+    cuerpo = {
+        "size": len(numeros),
+        "_source": ["numero_referencia", "texto", "paginas"],
+        "query": {"bool": {"filter": [
+            {"term": {"tipo": "referencia"}},
+            {"terms": {"numero_referencia": numeros}},
+        ]}},
+    }
+    respuesta = cliente.search(index=INDICE, body=cuerpo)
+    # Por número, para devolverlas en el orden en que se pidieron
+    por_numero = {
+        r["_source"]["numero_referencia"]: Referencia(
+            numero=r["_source"]["numero_referencia"],
+            texto=r["_source"]["texto"],
+            paginas=r["_source"]["paginas"],
+        )
+        for r in respuesta["hits"]["hits"]
+    }
+    return ResultadoReferencias(
+        referencias=[por_numero[n] for n in numeros if n in por_numero],
+        no_encontradas=[n for n in numeros if n not in por_numero],
+    )
