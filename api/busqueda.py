@@ -11,14 +11,17 @@
    "REALM").
 """
 
+import os
+
 import httpx
 from opensearchpy import OpenSearch
 from pydantic import BaseModel
 
 # 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no
-# escucha, y espera todo el timeout antes de pasar a 127.0.0.1
-URL_OPENSEARCH = "http://127.0.0.1:9200"
-URL_EMBED = "http://127.0.0.1:8000/v2/embed"
+# escucha, y espera todo el timeout antes de pasar a 127.0.0.1. Dentro de Docker se cambian con
+# variables de entorno (ahí los servicios se llaman por su nombre: http://opensearch:9200)
+URL_OPENSEARCH = os.environ.get("URL_OPENSEARCH", "http://127.0.0.1:9200")
+URL_EMBED = os.environ.get("URL_EMBED", "http://127.0.0.1:8000/v2/embed")
 # Índice donde la ingesta guardó los fragmentos
 INDICE = "fragmentos"
 # Modelo de embeddings que sirve vLLM (el mismo con el que se indexaron los fragmentos)

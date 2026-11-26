@@ -54,6 +54,7 @@ services:
     environment:
       OLLAMA_CONTEXT_LENGTH: "8192"             # Cuánto texto cabe en una sola petición, medido en tokens (pedazos de palabra): pregunta + historial + fragmentos
       OLLAMA_KEEP_ALIVE: "-1"                   # Mantiene el modelo cargado en la tarjeta de video; por default lo saca tras 5 min sin uso y recargarlo tarda mucho
+      LLAMA_ARG_CACHE_RAM: "1024"               # Tope (MiB) de la caché de prompts que llama-server (el motor de Ollama) guarda en RAM; por default es 8192 y crecía ~450 MB por pregunta hasta tumbar a Docker
     ports:
       - "127.0.0.1:11434:11434"                 # Puerto estándar de Ollama, también solo local
     volumes:
