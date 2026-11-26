@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cargarConversacion, preguntar, type Cita, type Respuesta } from './api'
 import { paginas, numero, tiempo, ultimaSeccion } from './formato'
-import { ArrowClockwise, ArrowUp, Check, Lightning, MagnifyingGlass, NotePencil, Warning } from './iconos'
+import { ArrowClockwise, ArrowSquareOut, ArrowUp, Check, Lightning, MagnifyingGlass, NotePencil, Warning } from './iconos'
 
 type Mensaje =
   | { rol: 'usuario'; texto: string }
@@ -133,8 +133,10 @@ function Bienvenida({ onElegir }: { onElegir: (p: string) => void }) {
     <div className="flex flex-col items-center pt-[12vh] text-center">
       <h1 className="text-h2 font-bold tracking-tight text-ink">Pregúntale al artículo</h1>
       <p className="mt-2 max-w-md text-body text-ink-muted">
-        Respuestas con base en <em>A Survey on Retrieval-Augmented Text Generation for Large Language
-        Models</em>, con la sección y la página de donde salen.
+        Respuestas con base en{' '}
+        <a href="/articulo.pdf" target="_blank" rel="noopener" className="text-brand-ink underline-offset-2 hover:underline">
+          <em>A Survey on Retrieval-Augmented Text Generation for Large Language Models</em>
+        </a>, con la sección y la página de donde salen.
       </p>
       <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
         {SUGERENCIAS.map((s) => (
@@ -194,11 +196,17 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
       <div className="whitespace-pre-wrap text-body text-ink">{m.texto}</div>
       {m.citas.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {agruparPorSeccion(m.citas).map((c) => (
-            <span key={c.seccion} className="chip" data-tone="brand" title={c.seccion}>
-              {ultimaSeccion(c.seccion)} · {paginas(c.paginas)}
-            </span>
-          ))}
+          {agruparPorSeccion(m.citas).map((c) => {
+            // Abre el PDF en la primera página del texto citado (el visor del navegador entiende #page)
+            const pagina = Math.min(...c.paginas)
+            return (
+              <a key={c.seccion} className="chip cita" data-tone="brand" href={`/articulo.pdf#page=${pagina}`}
+                target="_blank" rel="noopener" title={`${c.seccion} — abrir el PDF en la página ${pagina}`}>
+                {ultimaSeccion(c.seccion)} · {paginas(c.paginas)}
+                <ArrowSquareOut size={11} weight="bold" />
+              </a>
+            )
+          })}
         </div>
       )}
       {m.meta && (

@@ -61,6 +61,8 @@ Recorrido de una pregunta:
    la búsqueda no le dio.
 6. La API convierte los fragmentos citados en sección y páginas, guarda todo en PostgreSQL y
    manda la respuesta por SSE. Mientras tanto, la interfaz muestra en vivo qué se está buscando.
+7. Cada cita es un enlace que abre el PDF del artículo (`/articulo.pdf#page=N`) en la página del
+   texto citado.
 
 ### Rol de cada componente
 

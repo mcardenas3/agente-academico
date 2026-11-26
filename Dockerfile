@@ -25,10 +25,13 @@ COPY api/*.py api/esquema.sql ./
 # Lo necesario para crear el índice si está vacío (preparar_indice.py), sin Docling
 COPY ingesta/crear_indice.py ingesta/indexar.py ingesta/preparar_indice.py /app/ingesta/
 COPY datos/procesado/fragmentos.jsonl /app/datos/procesado/fragmentos.jsonl
+# El artículo, para que las citas abran el PDF en su página
+COPY datos/huang2026-rag-survey.pdf /app/datos/huang2026-rag-survey.pdf
 
 COPY --from=web /web/dist /app/web/dist
 
-ENV PATH="/app/api/.venv/bin:$PATH" CARPETA_WEB=/app/web/dist PYTHONUNBUFFERED=1
+ENV PATH="/app/api/.venv/bin:$PATH" CARPETA_WEB=/app/web/dist \
+    ARCHIVO_PDF=/app/datos/huang2026-rag-survey.pdf PYTHONUNBUFFERED=1
 EXPOSE 8080
 # Al arrancar: deja listo el índice (no hace nada si ya está) y levanta la API
 CMD ["sh", "-c", "python /app/ingesta/preparar_indice.py && exec uvicorn main:app --host 0.0.0.0 --port 8080"]

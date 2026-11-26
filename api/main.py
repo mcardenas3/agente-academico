@@ -4,6 +4,7 @@ Rutas:
     POST /api/chat                     pregunta → eventos SSE ("conversacion", "buscando",
                                        "respuesta" o "error")
     GET  /api/conversaciones/{id}      mensajes de una conversación, para volver a pintarla
+    GET  /articulo.pdf                 el artículo; las citas lo abren en su página (#page=N)
     GET  /api/salud                    estado de cada servicio
     GET  /api/admin/resumen            totales y promedios          ┐
     GET  /api/admin/por-dia            serie diaria para la gráfica ├ piden "Authorization: Bearer <ADMIN_TOKEN>"
@@ -27,6 +28,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, Field
 
@@ -45,6 +47,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 # La interfaz compilada; en Docker se copia aquí al construir la imagen
 CARPETA_WEB = Path(os.environ.get("CARPETA_WEB", Path(__file__).resolve().parent.parent / "web" / "dist"))
+# El artículo en PDF, para que las citas abran la página exacta (/articulo.pdf#page=16)
+ARCHIVO_PDF = Path(os.environ.get(
+    "ARCHIVO_PDF", Path(__file__).resolve().parent.parent / "datos" / "huang2026-rag-survey.pdf"))
 
 
 async def calentar() -> None:
@@ -147,6 +152,14 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
 @app.get("/api/conversaciones/{conversacion_id}")
 async def conversacion(conversacion_id: uuid.UUID, request: Request) -> list[dict]:
     return await bd.mensajes_de(request.app.state.grupo, conversacion_id)
+
+
+@app.get("/articulo.pdf", include_in_schema=False)
+async def articulo() -> FileResponse:
+    """El PDF del artículo (CC BY 4.0). "inline" hace que el navegador lo abra en su visor, que
+    entiende #page=N en la URL; así cada cita lleva a la página de donde salió."""
+    return FileResponse(ARCHIVO_PDF, media_type="application/pdf",
+                        headers={"Content-Disposition": 'inline; filename="huang2026-rag-survey.pdf"'})
 
 
 @app.get("/api/salud")

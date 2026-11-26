@@ -71,6 +71,9 @@ body {
     border-radius: 999px; padding: 0.15rem 0.6rem;
     font-size: var(--text-micro); font-weight: 600; line-height: 1.4; white-space: nowrap;
   }
+  /* Cita que abre el PDF: sube un paso de la escala al pasar el mouse */
+  a.cita { text-decoration: none; transition: background 120ms, border-color 120ms; }
+  a.cita:hover { background: var(--violet-4); border-color: var(--violet-8); }
   .card { border: 1px solid var(--mauve-5); background: var(--mauve-2); border-radius: 14px; }
   .card[data-tone] { border-color: var(--t7); background: var(--t3); color: var(--t11); }
   .btn {
