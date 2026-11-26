@@ -19,9 +19,7 @@ dependencies = [
     "psycopg[binary,pool]>=3.3.9",
     # Pydantic AI con el grupo "openai": Ollama se usa por su API compatible con OpenAI
     "pydantic-ai-slim[openai]>=2.75.0",
-    # Lee los formularios con archivo (los PDFs que se suben desde /admin)
-    "python-multipart>=0.0.34",
-    # Cliente de Redis (caché de respuestas, historial reciente y cola de artículos)
+    # Cliente de Redis (caché de respuestas e historial reciente)
     "redis>=8.2.0",
     # El programa que corre la aplicación de FastAPI
     "uvicorn[standard]>=0.54.0",

@@ -72,8 +72,6 @@ CONFIGURACION = {
             # Título y DOI del artículo, para citar
             "articulo": {"type": "keyword"},
             "doi": {"type": "keyword"},
-            # Id del artículo en la biblioteca ("huang2026-rag-survey"): filtra la búsqueda
-            "articulo_id": {"type": "keyword"},
             # El vector del fragmento (se llena en el paso 6)
             "vector": {
                 "type": "knn_vector",

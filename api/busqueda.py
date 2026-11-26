@@ -37,19 +37,10 @@ CANDIDATOS = 10
 PESO_BM25 = 0.3
 # Nombre con que se guarda el pipeline en OpenSearch (se crea una vez, ver preparar_pipeline)
 PIPELINE = "hibrida-mm30"
+# Solo fragmentos de contenido: las fichas de la bibliografía se traen con otra tool por su número
+SOLO_CONTENIDO = {"term": {"tipo": "contenido"}}
 # Campos que se piden de cada fragmento: lo que el agente necesita para responder y citar
-CAMPOS = ["id", "seccion", "paginas", "texto", "articulo_id", "articulo"]
-
-
-def filtro(tipo: str, articulos: list[str] | None) -> dict:
-    """Filtro de la búsqueda: un tipo de fragmento y, si se eligieron, solo esos artículos.
-
-    La búsqueda usa tipo "contenido": las fichas de la bibliografía se traen con otra tool por su
-    número de cita."""
-    condiciones = [{"term": {"tipo": tipo}}]
-    if articulos:
-        condiciones.append({"terms": {"articulo_id": articulos}})
-    return {"bool": {"filter": condiciones}}
+CAMPOS = ["id", "seccion", "paginas", "texto"]
 
 
 class Fragmento(BaseModel):
@@ -59,8 +50,6 @@ class Fragmento(BaseModel):
     seccion: str         # "5 Post-Retrieval > 5.1 Re-Ranking"
     paginas: list[int]   # [16, 17]
     texto: str           # el texto del fragmento, tal como lo leerá el LLM
-    articulo_id: str     # "huang2026-rag-survey": de qué artículo de la biblioteca viene
-    articulo: str        # su título
 
 
 def preparar_pipeline(cliente: OpenSearch) -> None:
@@ -93,12 +82,10 @@ def vectorizar(pregunta: str) -> list[float]:
     return respuesta.json()["embeddings"]["float"][0]
 
 
-def buscar_con_vector(cliente: OpenSearch, pregunta_en: str, vector: list[float],
-                      articulos: list[str] | None = None) -> list[Fragmento]:
+def buscar_con_vector(cliente: OpenSearch, pregunta_en: str, vector: list[float]) -> list[Fragmento]:
     """La búsqueda híbrida con el vector ya calculado. Devuelve los K mejores fragmentos.
 
     Va separada de vectorizar() para poder comparar contra la evaluación con el mismo vector.
-    Con articulos, busca solo en esos artículos de la biblioteca; sin ellos, en todos.
     """
     cuerpo = {
         "size": CANDIDATOS,  # se piden 10 como en la evaluación y abajo se quedan los K primeros
@@ -111,7 +98,7 @@ def buscar_con_vector(cliente: OpenSearch, pregunta_en: str, vector: list[float]
                 {"knn": {"vector": {"vector": vector, "k": CANDIDATOS}}},
             ],
             # El filtro se aplica a las dos subconsultas antes de combinarlas
-            "filter": filtro("contenido", articulos),
+            "filter": SOLO_CONTENIDO,
         }},
     }
     respuesta = cliente.search(index=INDICE, body=cuerpo, params={"search_pipeline": PIPELINE})
@@ -120,10 +107,9 @@ def buscar_con_vector(cliente: OpenSearch, pregunta_en: str, vector: list[float]
     return [Fragmento(**r["_source"]) for r in resultados]
 
 
-def buscar_fragmentos(cliente: OpenSearch, pregunta: str, pregunta_en: str,
-                      articulos: list[str] | None = None) -> list[Fragmento]:
+def buscar_fragmentos(cliente: OpenSearch, pregunta: str, pregunta_en: str) -> list[Fragmento]:
     """Lo que hará la tool: vectoriza la pregunta original y busca con las dos versiones."""
-    return buscar_con_vector(cliente, pregunta_en, vectorizar(pregunta), articulos)
+    return buscar_con_vector(cliente, pregunta_en, vectorizar(pregunta))
 
 
 def traer_fragmentos(cliente: OpenSearch, ids: list[str]) -> list[Fragmento]:
@@ -148,7 +134,6 @@ MAX_REFERENCIAS = 10
 class Referencia(BaseModel):
     """Una ficha de la bibliografía del artículo."""
 
-    articulo_id: str     # de qué artículo es la bibliografía (cada uno numera la suya)
     numero: int          # 48, el que aparece en el texto como "[48]"
     texto: str           # autores, año, título y dónde se publicó
     paginas: list[int]   # página del artículo donde está la ficha
@@ -161,12 +146,8 @@ class ResultadoReferencias(BaseModel):
     no_encontradas: list[int]  # así el agente sabe que el número estaba mal, en vez de inventar
 
 
-def traer_referencias(cliente: OpenSearch, numeros: list[int], articulo_id: str
-                      ) -> ResultadoReferencias:
-    """Trae las fichas de la bibliografía de un artículo con esos números de cita, en orden.
-
-    Es de un solo artículo a la vez porque cada uno tiene su propia [48].
-    """
+def traer_referencias(cliente: OpenSearch, numeros: list[int]) -> ResultadoReferencias:
+    """Trae las fichas de la bibliografía con esos números de cita, en el orden pedido."""
     # Sin repetidos y conservando el orden: dict.fromkeys guarda la primera aparición de cada uno
     numeros = list(dict.fromkeys(numeros))
     if not numeros:
@@ -181,7 +162,6 @@ def traer_referencias(cliente: OpenSearch, numeros: list[int], articulo_id: str
         "_source": ["numero_referencia", "texto", "paginas"],
         "query": {"bool": {"filter": [
             {"term": {"tipo": "referencia"}},
-            {"term": {"articulo_id": articulo_id}},
             {"terms": {"numero_referencia": numeros}},
         ]}},
     }
@@ -189,7 +169,6 @@ def traer_referencias(cliente: OpenSearch, numeros: list[int], articulo_id: str
     # Por número, para devolverlas en el orden en que se pidieron
     por_numero = {
         r["_source"]["numero_referencia"]: Referencia(
-            articulo_id=articulo_id,
             numero=r["_source"]["numero_referencia"],
             texto=r["_source"]["texto"],
             paginas=r["_source"]["paginas"],

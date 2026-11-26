@@ -20,8 +20,6 @@ from crear_indice import CONFIGURACION, FRAGMENTOS, INDICE, URL_OPENSEARCH
 
 # Cuánto esperar a OpenSearch si todavía está arrancando
 INTENTOS, ESPERA = 30, 5
-# Id del artículo original en la biblioteca (prefijo de los ids de sus fragmentos)
-ARTICULO_ORIGINAL = "huang2026-rag-survey"
 
 
 def main() -> None:
@@ -40,20 +38,11 @@ def main() -> None:
         sys.exit("OpenSearch no respondió")
 
     if cliente.indices.exists(index=INDICE):
-        # Un índice de antes de la biblioteca no tiene el campo articulo_id: se agrega (agregar un
-        # campo nuevo sí se puede; cambiar uno que ya existe no)
-        campos = cliente.indices.get_mapping(index=INDICE)[INDICE]["mappings"]["properties"]
-        if "articulo_id" not in campos:
-            cliente.indices.put_mapping(index=INDICE, body={
-                "properties": {"articulo_id": {"type": "keyword"}}})
-            print("Campo articulo_id agregado al índice")
-        # Solo se cuentan los fragmentos del artículo original: los subidos no salen de este archivo
-        hay = cliente.count(index=INDICE, body={
-            "query": {"term": {"articulo_id": ARTICULO_ORIGINAL}}})["count"]
+        hay = cliente.count(index=INDICE)["count"]
         if hay == esperados:
-            print(f"Índice {INDICE} listo: {hay} fragmentos del artículo original")
+            print(f"Índice {INDICE} listo: {hay} fragmentos")
             return
-        print(f"El índice tiene {hay} de {esperados} fragmentos del original: se vuelve a llenar")
+        print(f"El índice tiene {hay} de {esperados} fragmentos: se vuelve a llenar")
     else:
         cliente.indices.create(index=INDICE, body=CONFIGURACION)
         print(f"Índice {INDICE} creado")

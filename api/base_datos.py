@@ -33,30 +33,22 @@ LARGO_TITULO = 80
 
 
 async def asegurar_conversacion(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID,
-                                cliente_id: uuid.UUID | None, pregunta: str,
-                                articulo_id: str | None) -> str | None:
-    """Crea la conversación (con la pregunta como título y su artículo) o la marca como usada.
+                                cliente_id: uuid.UUID | None, pregunta: str) -> None:
+    """Crea la conversación (con la pregunta como título) o la marca como recién usada.
 
     Si una conversación vieja no tenía dueño, la toma el navegador que la siguió: así la
-    conversación que ya estaba abierta antes de existir el historial también aparece en él.
-    Devuelve el artículo de la conversación: el que se eligió al empezarla manda sobre el que
-    llegue después (None = todos)."""
+    conversación que ya estaba abierta antes de existir el historial también aparece en él."""
     titulo = pregunta if len(pregunta) <= LARGO_TITULO else pregunta[:LARGO_TITULO - 1] + "…"
     async with grupo.connection() as conexion:
-        existente = await (await conexion.execute(
-            "SELECT articulo_id FROM conversaciones WHERE id = %s", (conversacion_id,))).fetchone()
-        if existente:
-            articulo_id = existente["articulo_id"]
         await conexion.execute(
-            "INSERT INTO conversaciones (id, cliente_id, titulo, articulo_id) VALUES (%s, %s, %s, %s) "
+            "INSERT INTO conversaciones (id, cliente_id, titulo) VALUES (%s, %s, %s) "
             "ON CONFLICT (id) DO UPDATE SET actualizada_en = now(), "
             " cliente_id = COALESCE(conversaciones.cliente_id, EXCLUDED.cliente_id), "
             # Una conversación de antes del historial no tiene título: se usa su primera pregunta
             " titulo = COALESCE(conversaciones.titulo, (SELECT left(contenido, %s) FROM mensajes"
             "  WHERE conversacion_id = EXCLUDED.id AND rol = 'usuario' ORDER BY id LIMIT 1),"
             "  EXCLUDED.titulo)",
-            (conversacion_id, cliente_id, titulo, articulo_id, LARGO_TITULO))
-    return articulo_id
+            (conversacion_id, cliente_id, titulo, LARGO_TITULO))
 
 
 async def conversaciones_de(grupo: AsyncConnectionPool, cliente_id: uuid.UUID, limite: int
@@ -64,7 +56,7 @@ async def conversaciones_de(grupo: AsyncConnectionPool, cliente_id: uuid.UUID, l
     """El historial de un navegador: sus conversaciones visibles, la más reciente primero."""
     async with grupo.connection() as conexion:
         return await (await conexion.execute(
-            "SELECT c.id, c.titulo, c.actualizada_en, c.articulo_id,"
+            "SELECT c.id, c.titulo, c.actualizada_en,"
             " (SELECT count(*) FROM mensajes m WHERE m.conversacion_id = c.id"
             "  AND m.rol = 'usuario') AS preguntas"
             " FROM conversaciones c WHERE c.cliente_id = %s AND NOT c.oculta"
@@ -136,44 +128,6 @@ async def mensajes_de(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID) ->
             " FROM mensajes m LEFT JOIN citas c ON c.mensaje_id = m.id"
             " WHERE m.conversacion_id = %s GROUP BY m.id ORDER BY m.id",
             (conversacion_id,))).fetchall()
-
-
-# --- Biblioteca de artículos ---
-
-COLUMNAS_ARTICULO = ("id, titulo, original, estado, progreso, error, paginas, fragmentos, "
-                     "subido_en, procesado_en")
-
-
-async def articulos(grupo: AsyncConnectionPool, solo_listos: bool) -> list[dict]:
-    """Los artículos de la biblioteca: el original primero y luego del más nuevo al más viejo."""
-    donde = "WHERE estado = 'listo'" if solo_listos else ""
-    async with grupo.connection() as conexion:
-        return await (await conexion.execute(
-            f"SELECT {COLUMNAS_ARTICULO} FROM articulos {donde} "
-            "ORDER BY original DESC, subido_en DESC")).fetchall()
-
-
-async def articulo(grupo: AsyncConnectionPool, articulo_id: str) -> dict | None:
-    async with grupo.connection() as conexion:
-        return await (await conexion.execute(
-            f"SELECT {COLUMNAS_ARTICULO}, archivo FROM articulos WHERE id = %s",
-            (articulo_id,))).fetchone()
-
-
-async def registrar_articulo(grupo: AsyncConnectionPool, articulo_id: str, titulo: str | None,
-                             archivo: str) -> dict:
-    """Da de alta un artículo subido, en la cola. Sin título, el trabajador lo saca del PDF."""
-    async with grupo.connection() as conexion:
-        return await (await conexion.execute(
-            "INSERT INTO articulos (id, titulo, archivo, estado, progreso) "
-            "VALUES (%s, %s, %s, 'en_cola', 'En la cola') "
-            f"RETURNING {COLUMNAS_ARTICULO}", (articulo_id, titulo or "", archivo))).fetchone()
-
-
-async def borrar_articulo(grupo: AsyncConnectionPool, articulo_id: str) -> None:
-    async with grupo.connection() as conexion:
-        await conexion.execute("DELETE FROM articulos WHERE id = %s AND NOT original",
-                               (articulo_id,))
 
 
 # --- Lo que lee el panel /admin ---

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  articuloDe, cargarConversacion, cargarFragmentos, listarArticulos, listarConversaciones, ocultarConversacion,
-  preguntar, urlPdf, type Articulo, type Cita, type ConversacionResumen, type Fragmento, type Respuesta,
+  cargarConversacion, cargarFragmentos, listarConversaciones, ocultarConversacion, preguntar,
+  type Cita, type ConversacionResumen, type Fragmento, type Respuesta,
 } from './api'
 import { paginas, numero, tiempo, ultimaSeccion } from './formato'
 import Historial from './Historial'
 import {
-  ArrowClockwise, ArrowSquareOut, ArrowUp, BookOpenText, CaretDown, Check, Lightning, List, MagnifyingGlass,
-  NotePencil, Quotes, Warning,
+  ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, List, MagnifyingGlass, NotePencil, Quotes, Warning,
 } from './iconos'
 
 type Mensaje =
@@ -16,18 +15,11 @@ type Mensaje =
   | { rol: 'pensando'; busqueda: string | null }
   | { rol: 'error'; texto: string; pregunta: string }
 
-// Sugerencias para el survey original; para los artículos subidos van unas que sirven para cualquiera
-const SUGERENCIAS_ORIGINAL = [
+const SUGERENCIAS = [
   '¿Cuáles son las fases del paradigma RAG?',
   '¿Qué es HyDE y cómo mejora la recuperación?',
   '¿Para qué sirve el re-ranking?',
   'How does RAPTOR organize documents?',
-]
-const SUGERENCIAS_GENERALES = [
-  '¿De qué trata este artículo?',
-  '¿Cuáles son sus principales conclusiones?',
-  '¿Qué métodos propone o compara?',
-  '¿Qué limitaciones menciona?',
 ]
 
 const LLAVE_CONVERSACION = 'conversacion_id'
@@ -39,9 +31,6 @@ function guardarConversacion(id: string | null) {
   try { id ? localStorage.setItem(LLAVE_CONVERSACION, id) : localStorage.removeItem(LLAVE_CONVERSACION) } catch { /* nada */ }
 }
 
-/** Título corto para un chip: «A Survey on Retrieval-Augmented…» */
-const corto = (titulo: string) => (titulo.length > 34 ? `${titulo.slice(0, 33).trimEnd()}…` : titulo)
-
 export default function Chat() {
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [conversacion, setConversacion] = useState<string | null>(leerConversacion)
@@ -49,14 +38,10 @@ export default function Chat() {
   const [ocupado, setOcupado] = useState(false)
   const [historial, setHistorial] = useState<ConversacionResumen[]>([])
   const [historialAbierto, setHistorialAbierto] = useState(false)  // solo cuenta en celular
-  const [articulos, setArticulos] = useState<Articulo[]>([])
-  // Artículo de la conversación actual (o el elegido para la nueva); null = todos los artículos
-  const [elegido, setElegido] = useState<string | null>(null)
   const final = useRef<HTMLDivElement>(null)
   const entrada = useRef<HTMLTextAreaElement>(null)
 
   const refrescarHistorial = useCallback(() => { listarConversaciones().then(setHistorial) }, [])
-  const tituloDe = useCallback((id: string) => articulos.find((a) => a.id === id)?.titulo ?? id, [articulos])
 
   // Pinta una conversación guardada (sus mensajes con sus citas)
   async function cargar(id: string) {
@@ -66,19 +51,12 @@ export default function Chat() {
       : { rol: 'agente', texto: m.contenido, citas: m.citas })))
   }
 
-  // Al abrir: la biblioteca, el historial y la última conversación (si la hay)
+  // Al abrir, se recupera la última conversación (si la hay) y el historial
   useEffect(() => {
     const id = leerConversacion()
     if (id) void cargar(id)
-    listarArticulos().then(setArticulos)
     refrescarHistorial()
   }, [refrescarHistorial])
-
-  // Cuando llega el historial, la conversación recuperada toma su artículo
-  useEffect(() => {
-    const actual = historial.find((c) => c.id === conversacion)
-    if (actual) setElegido(actual.articulo_id)
-  }, [historial, conversacion])
 
   useEffect(() => { final.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [mensajes])
 
@@ -92,8 +70,8 @@ export default function Chat() {
     setOcupado(true)
     setMensajes((ms) => [...ms.filter((m) => m.rol !== 'error'), { rol: 'usuario', texto: pregunta },
       { rol: 'pensando', busqueda: null }])
-    await preguntar(pregunta, conversacion, elegido, {
-      conversacion: (id, articuloId) => { setConversacion(id); guardarConversacion(id); setElegido(articuloId) },
+    await preguntar(pregunta, conversacion, {
+      conversacion: (id) => { setConversacion(id); guardarConversacion(id) },
       buscando: (consulta) => reemplazarUltimo({ rol: 'pensando', busqueda: consulta }),
       respuesta: (r) => reemplazarUltimo({ rol: 'agente', texto: r.respuesta, citas: r.citas, meta: r }),
       error: (mensaje) => reemplazarUltimo({ rol: 'error', texto: mensaje, pregunta }),
@@ -108,7 +86,6 @@ export default function Chat() {
     if (ocupado || id === conversacion) return
     setConversacion(id)
     guardarConversacion(id)
-    setElegido(historial.find((c) => c.id === id)?.articulo_id ?? null)
     await cargar(id)
   }
 
@@ -130,13 +107,8 @@ export default function Chat() {
     setConversacion(null)
     guardarConversacion(null)
     setHistorialAbierto(false)
-    listarArticulos().then(setArticulos)  // por si se subió uno mientras tanto
     entrada.current?.focus()
   }
-
-  // Con varios artículos y sin uno elegido, cada cita dice de qué artículo sale
-  const mostrarArticulo = elegido === null && articulos.length > 1
-  const vacia = mensajes.length === 0
 
   return (
     <div className="flex h-full">
@@ -146,14 +118,11 @@ export default function Chat() {
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-          {vacia ? (
-            <Bienvenida articulos={articulos} elegido={elegido} onElegirArticulo={setElegido} onPreguntar={enviar} />
+          {mensajes.length === 0 ? (
+            <Bienvenida onElegir={enviar} />
           ) : (
             <div className="flex flex-col gap-6">
-              <Alcance articulos={articulos} elegido={elegido} />
-              {mensajes.map((m, i) => (
-                <Burbuja key={i} m={m} onReintentar={reintentar} mostrarArticulo={mostrarArticulo} tituloDe={tituloDe} />
-              ))}
+              {mensajes.map((m, i) => <Burbuja key={i} m={m} onReintentar={reintentar} />)}
             </div>
           )}
           <div ref={final} />
@@ -170,7 +139,7 @@ export default function Chat() {
             title="Historial" aria-label="Abrir historial">
             <List size={18} weight="bold" />
           </button>
-          {!vacia && (
+          {mensajes.length > 0 && (
             <button type="button" className="btn btn-ghost h-11 px-3 md:hidden" onClick={nuevaConversacion}
               disabled={ocupado} title="Nueva conversación" aria-label="Nueva conversación">
               <NotePencil size={18} weight="bold" />
@@ -181,7 +150,7 @@ export default function Chat() {
             className="campo max-h-40 min-h-11 flex-1 resize-none py-2.5"
             rows={1}
             maxLength={1000}
-            placeholder={elegido === null && articulos.length > 1 ? 'Pregunta algo sobre los artículos…' : 'Pregunta algo sobre el artículo…'}
+            placeholder="Pregunta algo sobre el artículo…"
             value={texto}
             autoFocus
             onChange={(e) => setTexto(e.target.value)}
@@ -201,44 +170,19 @@ export default function Chat() {
   )
 }
 
-function Bienvenida({ articulos, elegido, onElegirArticulo, onPreguntar }: {
-  articulos: Articulo[]
-  elegido: string | null
-  onElegirArticulo: (id: string | null) => void
-  onPreguntar: (p: string) => void
-}) {
-  const articulo = articulos.find((a) => a.id === elegido)
-  const varios = articulos.length > 1
-  const sugerencias = articulo && !articulo.original ? SUGERENCIAS_GENERALES : SUGERENCIAS_ORIGINAL
+function Bienvenida({ onElegir }: { onElegir: (p: string) => void }) {
   return (
-    <div className="flex flex-col items-center pt-[10vh] text-center">
-      <h1 className="text-h2 font-bold tracking-tight text-ink">
-        {varios && !articulo ? 'Pregúntale a la biblioteca' : 'Pregúntale al artículo'}
-      </h1>
-      {varios ? (
-        <label className="mt-4 flex w-full max-w-xl items-center gap-2 text-left">
-          <BookOpenText size={16} weight="bold" className="shrink-0 text-ink-faint" />
-          <select className="campo py-2 text-meta" value={elegido ?? ''}
-            onChange={(e) => onElegirArticulo(e.target.value || null)} aria-label="Artículo">
-            <option value="">Todos los artículos ({articulos.length})</option>
-            {articulos.map((a) => <option key={a.id} value={a.id}>{a.titulo}</option>)}
-          </select>
-        </label>
-      ) : null}
-      <p className="mt-3 max-w-md text-body text-ink-muted">
-        {articulo || !varios ? (
-          <>Respuestas con base en{' '}
-            <a href={urlPdf(articulo?.id ?? articulos[0]?.id ?? 'huang2026-rag-survey')} target="_blank" rel="noopener"
-              className="text-brand-ink underline-offset-2 hover:underline">
-              <em>{articulo?.titulo ?? articulos[0]?.titulo ?? 'el artículo'}</em>
-            </a>, con la sección y la página de donde salen.</>
-        ) : (
-          <>Busca en los {articulos.length} artículos a la vez; cada cita dice de cuál sale.</>
-        )}
+    <div className="flex flex-col items-center pt-[12vh] text-center">
+      <h1 className="text-h2 font-bold tracking-tight text-ink">Pregúntale al artículo</h1>
+      <p className="mt-2 max-w-md text-body text-ink-muted">
+        Respuestas con base en{' '}
+        <a href="/articulo.pdf" target="_blank" rel="noopener" className="text-brand-ink underline-offset-2 hover:underline">
+          <em>A Survey on Retrieval-Augmented Text Generation for Large Language Models</em>
+        </a>, con la sección y la página de donde salen.
       </p>
       <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
-        {sugerencias.map((s) => (
-          <button key={s} onClick={() => onPreguntar(s)}
+        {SUGERENCIAS.map((s) => (
+          <button key={s} onClick={() => onElegir(s)}
             className="card px-4 py-3 text-left text-meta text-ink-muted transition-colors hover:border-brand-line hover:text-ink">
             {s}
           </button>
@@ -248,28 +192,7 @@ function Bienvenida({ articulos, elegido, onElegirArticulo, onPreguntar }: {
   )
 }
 
-/** Arriba de la conversación: sobre qué artículo se está preguntando. */
-function Alcance({ articulos, elegido }: { articulos: Articulo[]; elegido: string | null }) {
-  if (articulos.length <= 1) return null
-  const articulo = articulos.find((a) => a.id === elegido)
-  return (
-    <div className="flex items-center gap-1.5 text-micro text-ink-faint">
-      <BookOpenText size={13} weight="bold" />
-      {articulo ? (
-        <a href={urlPdf(articulo.id)} target="_blank" rel="noopener" className="truncate hover:text-ink hover:underline">
-          {articulo.titulo}
-        </a>
-      ) : <span>Todos los artículos de la biblioteca</span>}
-    </div>
-  )
-}
-
-function Burbuja({ m, onReintentar, mostrarArticulo, tituloDe }: {
-  m: Mensaje
-  onReintentar: (p: string) => void
-  mostrarArticulo: boolean
-  tituloDe: (id: string) => string
-}) {
+function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) => void }) {
   if (m.rol === 'usuario') {
     return (
       <div className="flex justify-end">
@@ -316,13 +239,11 @@ function Burbuja({ m, onReintentar, mostrarArticulo, tituloDe }: {
       {m.citas.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {agruparPorSeccion(m.citas).map((c) => {
-            // Abre el PDF de su artículo en la primera página del texto citado (#page)
+            // Abre el PDF en la primera página del texto citado (el visor del navegador entiende #page)
             const pagina = Math.min(...c.paginas)
-            const titulo = tituloDe(c.articulo)
             return (
-              <a key={`${c.articulo}|${c.seccion}`} className="chip cita" data-tone="brand" href={urlPdf(c.articulo, pagina)}
-                target="_blank" rel="noopener" title={`${titulo} — ${c.seccion} — abrir el PDF en la página ${pagina}`}>
-                {mostrarArticulo && <span className="font-normal opacity-80">{corto(titulo)} ·</span>}
+              <a key={c.seccion} className="chip cita" data-tone="brand" href={`/articulo.pdf#page=${pagina}`}
+                target="_blank" rel="noopener" title={`${c.seccion} — abrir el PDF en la página ${pagina}`}>
                 {ultimaSeccion(c.seccion)} · {paginas(c.paginas)}
                 <ArrowSquareOut size={11} weight="bold" />
               </a>
@@ -330,7 +251,7 @@ function Burbuja({ m, onReintentar, mostrarArticulo, tituloDe }: {
           })}
         </div>
       )}
-      {m.citas.length > 0 && <TextoCitado citas={m.citas} mostrarArticulo={mostrarArticulo} />}
+      {m.citas.length > 0 && <TextoCitado citas={m.citas} />}
       {m.meta && (
         <div className="flex flex-wrap items-center gap-2 text-micro text-ink-faint">
           {fuera && <span className="chip" data-tone="warn">Fuera del artículo</span>}
@@ -346,7 +267,7 @@ function Burbuja({ m, onReintentar, mostrarArticulo, tituloDe }: {
 }
 
 /** Despliega el texto exacto de los fragmentos en que se basó la respuesta. Se pide al abrirlo. */
-function TextoCitado({ citas, mostrarArticulo }: { citas: Cita[]; mostrarArticulo: boolean }) {
+function TextoCitado({ citas }: { citas: Cita[] }) {
   const [abierto, setAbierto] = useState(false)
   const [fragmentos, setFragmentos] = useState<Fragmento[] | null>(null)
   const [error, setError] = useState(false)
@@ -377,12 +298,9 @@ function TextoCitado({ citas, mostrarArticulo }: { citas: Cita[]; mostrarArticul
             return (
               <figure key={f.id} className="m-0 rounded-[10px] border border-line-subtle bg-raised">
                 <figcaption className="flex items-center gap-2 border-b border-line-subtle px-3 py-1.5 text-micro text-ink-muted">
-                  <span className="min-w-0 truncate" title={`${f.articulo} — ${f.seccion}`}>
-                    {mostrarArticulo && <span className="font-semibold text-ink">{corto(f.articulo)} · </span>}
-                    {f.seccion}
-                  </span>
+                  <span className="min-w-0 truncate" title={f.seccion}>{f.seccion}</span>
                   <a className="ml-auto inline-flex shrink-0 items-center gap-1 font-semibold text-brand-ink hover:underline"
-                    href={urlPdf(f.articulo_id, Math.min(...f.paginas))} target="_blank" rel="noopener">
+                    href={`/articulo.pdf#page=${Math.min(...f.paginas)}`} target="_blank" rel="noopener">
                     {paginas(f.paginas)} <ArrowSquareOut size={11} weight="bold" />
                   </a>
                 </figcaption>
@@ -400,17 +318,15 @@ function TextoCitado({ citas, mostrarArticulo }: { citas: Cita[]; mostrarArticul
   )
 }
 
-/** Varios fragmentos de la misma sección (del mismo artículo) se muestran como una sola cita. */
+/** Varios fragmentos de la misma sección se muestran como una sola cita con todas sus páginas. */
 function agruparPorSeccion(citas: Cita[]) {
-  const grupos = new Map<string, { articulo: string; seccion: string; paginas: Set<number> }>()
+  const porSeccion = new Map<string, Set<number>>()
   for (const c of citas) {
-    const articulo = c.articulo_id ?? articuloDe(c.id)
-    const llave = `${articulo}|${c.seccion}`
-    const grupo = grupos.get(llave) ?? { articulo, seccion: c.seccion, paginas: new Set<number>() }
-    c.paginas.forEach((p) => grupo.paginas.add(p))
-    grupos.set(llave, grupo)
+    const conjunto = porSeccion.get(c.seccion) ?? new Set<number>()
+    c.paginas.forEach((p) => conjunto.add(p))
+    porSeccion.set(c.seccion, conjunto)
   }
-  return [...grupos.values()].map((g) => ({ ...g, paginas: [...g.paginas] }))
+  return [...porSeccion].map(([seccion, ps]) => ({ seccion, paginas: [...ps] }))
 }
 
 function Paso({ icono, activo, children }: { icono: React.ReactNode; activo?: boolean; children: React.ReactNode }) {

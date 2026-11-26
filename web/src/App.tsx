@@ -30,7 +30,7 @@ export default function App() {
           <span className="leading-tight">
             <span className="block text-[14px] font-bold text-ink">Agente académico</span>
             <span className="hidden text-micro text-ink-faint sm:block">
-              Preguntas sobre artículos científicos, con cita y página
+              Huang &amp; Huang · ACM Computing Surveys, 2026
             </span>
           </span>
         </a>

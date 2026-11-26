@@ -123,11 +123,8 @@ services:
       URL_EMBED: http://vllm:8000/v2/embed
       URL_OLLAMA: http://ollama:11434/v1
       ADMIN_TOKEN: ${ADMIN_TOKEN}               # Token del panel /admin (en .env)
-      CARPETA_ARCHIVOS: /app/archivos           # Donde se guardan los PDFs subidos
     ports:
       - "127.0.0.1:8080:8080"                   # La app en http://127.0.0.1:8080, solo local (afuera se entra por ngrok)
-    volumes:
-      - archivos:/app/archivos                  # PDFs subidos: sobreviven a reinicios y los lee el trabajador
     depends_on:                                 # Arranca cuando todo lo demás ya responde
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -141,27 +138,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s                        # La primera vez arma el índice (~10 s) y calienta los modelos
-
-  # ---------- Trabajador: procesa con Docling los artículos subidos desde /admin ----------
-  trabajador:
-    build:
-      context: .
-      dockerfile: Dockerfile.trabajador
-    environment:
-      URL_BASE_DATOS: "host=postgres port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
-      URL_REDIS: redis://redis:6379/0           # De aquí saca la cola de trabajos
-      URL_OPENSEARCH: http://opensearch:9200
-      URL_EMBED: http://vllm:8000/v2/embed
-      CARPETA_ARCHIVOS: /app/archivos
-      HILOS_DOCLING: "4"                        # 4 de 8 núcleos: la laptop sigue respondiendo mientras convierte
-    volumes:
-      - archivos:/app/archivos:ro               # Solo lee los PDFs que guardó la app
-      - hf_cache:/root/.cache/huggingface       # El tokenizador ya lo bajó vLLM; los modelos de Docling se quedan aquí
-    mem_limit: 3g                               # Si Docling se pasa, se cae solo este contenedor (el artículo queda en "error")
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy              # La app crea la tabla de artículos al arrancar
 
   # ---------- ngrok: URL pública HTTPS hacia la app, para la demo ----------
   ngrok:
@@ -187,4 +163,3 @@ volumes:
   opensearch_data:
   ollama_data:
   hf_cache:
-  archivos:
