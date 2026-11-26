@@ -13,3 +13,7 @@ __pycache__/
 
 # Lo que produce Docling: se regenera corriendo ingesta/convertir.py
 datos/procesado/
+
+# Dependencias de la interfaz (se instalan con "npm install") y su versión compilada
+node_modules/
+web/dist/

@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/* Colores de Radix: cada escala tiene 12 pasos y su versión oscura se activa sola con .dark.
+   mauve = neutro, violet = marca, jade/amber/red = bien/atención/problema */
+@import '@radix-ui/colors/mauve.css';
+@import '@radix-ui/colors/mauve-dark.css';
+@import '@radix-ui/colors/violet.css';
+@import '@radix-ui/colors/violet-dark.css';
+@import '@radix-ui/colors/jade.css';
+@import '@radix-ui/colors/jade-dark.css';
+@import '@radix-ui/colors/amber.css';
+@import '@radix-ui/colors/amber-dark.css';
+@import '@radix-ui/colors/red.css';
+@import '@radix-ui/colors/red-dark.css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Nombres con significado para usar en las clases de Tailwind (bg-raised, text-ink-muted…) */
+@theme inline {
+  --color-canvas: var(--mauve-1);
+  --color-raised: var(--mauve-2);
+  --color-sunken: var(--mauve-3);
+  --color-hover: var(--mauve-4);
+  --color-line-subtle: var(--mauve-5);
+  --color-line: var(--mauve-6);
+  --color-line-strong: var(--mauve-8);
+  --color-ink: var(--mauve-12);
+  --color-ink-muted: var(--mauve-11);
+  --color-ink-faint: var(--mauve-10);
+  --color-brand: var(--violet-9);
+  --color-brand-hover: var(--violet-10);
+  --color-brand-ink: var(--violet-11);
+  --color-brand-surface: var(--violet-3);
+  --color-brand-line: var(--violet-7);
+
+  --text-micro: 11px;    --text-micro--line-height: 1.35;
+  --text-meta: 12.5px;   --text-meta--line-height: 1.45;
+  --text-body: 14px;     --text-body--line-height: 1.6;
+  --text-h3: 18px;       --text-h3--line-height: 1.3;
+  --text-h2: 24px;       --text-h2--line-height: 1.2;
+  --text-kpi: 26px;      --text-kpi--line-height: 1.1;
+
+  /* Tipografía del sistema: nada que descargar */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--mauve-1);
+  color: var(--mauve-12);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--violet-5); }
+
+/* Tonos: un elemento con data-tone usa tres pasos de su escala (fondo 3, borde 7, texto 11) */
+[data-tone] { --t3: var(--mauve-3); --t7: var(--mauve-7); --t9: var(--mauve-9); --t11: var(--mauve-11); }
+[data-tone='brand'] { --t3: var(--violet-3); --t7: var(--violet-7); --t9: var(--violet-9); --t11: var(--violet-11); }
+[data-tone='ok']    { --t3: var(--jade-3);   --t7: var(--jade-7);   --t9: var(--jade-9);   --t11: var(--jade-11); }
+[data-tone='warn']  { --t3: var(--amber-3);  --t7: var(--amber-7);  --t9: var(--amber-9);  --t11: var(--amber-11); }
+[data-tone='bad']   { --t3: var(--red-3);    --t7: var(--red-7);    --t9: var(--red-9);    --t11: var(--red-11); }
+
+@layer components {
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    border: 1px solid var(--t7, var(--mauve-6)); background: var(--t3, var(--mauve-2));
+    color: var(--t11, var(--mauve-11));
+    border-radius: 999px; padding: 0.15rem 0.6rem;
+    font-size: var(--text-micro); font-weight: 600; line-height: 1.4; white-space: nowrap;
+  }
+  .card { border: 1px solid var(--mauve-5); background: var(--mauve-2); border-radius: 14px; }
+  .card[data-tone] { border-color: var(--t7); background: var(--t3); color: var(--t11); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 10px;
+    padding: 0.45rem 0.8rem; font-size: var(--text-meta); font-weight: 600;
+    border: 1px solid var(--mauve-6); background: var(--mauve-2); color: var(--mauve-12);
+    transition: background 120ms, border-color 120ms;
+  }
+  .btn:hover { background: var(--mauve-4); }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--mauve-11); }
+  .btn-ghost:hover { background: var(--mauve-4); color: var(--mauve-12); }
+  .btn-primary { border-color: var(--violet-9); background: var(--violet-9); color: white; }
+  .btn-primary:hover { background: var(--violet-10); }
+  .btn:disabled { opacity: 0.45; pointer-events: none; }
+  .campo {
+    width: 100%; border: 1px solid var(--mauve-6); background: var(--mauve-1); color: var(--mauve-12);
+    border-radius: 10px; padding: 0.5rem 0.75rem; font-size: var(--text-body); outline: none;
+  }
+  .campo:focus { border-color: var(--violet-8); box-shadow: 0 0 0 3px var(--violet-4); }
+  .campo::placeholder { color: var(--mauve-10); }
+}
+
+/* Puntos animados de "pensando" (se apagan si la persona pidió menos movimiento) */
+@keyframes latido { 0%, 80%, 100% { opacity: 0.25 } 40% { opacity: 1 } }
+.latido span { animation: latido 1.2s infinite ease-in-out; }
+.latido span:nth-child(2) { animation-delay: 0.15s; }
+.latido span:nth-child(3) { animation-delay: 0.3s; }
+@media (prefers-reduced-motion: reduce) { .latido span { animation: none; opacity: 0.7; } }
