@@ -15,7 +15,12 @@ el lugar 1 de 403 en *Computer Science (miscellaneous)*
 ([captura](docs/evidencia/sjr-acm-computing-surveys.png)). 2025 es el año más reciente publicado: el
 SJR de 2026 sale a mediados de 2027.
 
-**Integrantes:** _(completar)_
+**Integrantes:**
+
+| Nombre | Matrícula |
+|---|---|
+| Marcelo Cárdenas Leal | A00836049 |
+| Fernando Daniel Renteria Saldaña | A00836509 |
 
 ---
 
