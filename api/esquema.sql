@@ -8,10 +8,22 @@
 -- las citas cuelgan solo de los mensajes del agente.
 
 CREATE TABLE IF NOT EXISTS conversaciones (
-    id          UUID PRIMARY KEY,
-    creada_en   TIMESTAMPTZ NOT NULL DEFAULT now()
+    id              UUID PRIMARY KEY,
+    creada_en       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE conversaciones IS 'Una conversación del chat; el navegador guarda su id';
+
+-- Historial por navegador (sin login). Van como ALTER para que una base ya creada también las
+-- reciba; en una base nueva se agregan justo después del CREATE
+ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS cliente_id UUID;
+ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS titulo TEXT;
+ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS actualizada_en TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS oculta BOOLEAN NOT NULL DEFAULT false;
+COMMENT ON COLUMN conversaciones.cliente_id IS 'Navegador dueño de la conversación (id aleatorio en su localStorage)';
+COMMENT ON COLUMN conversaciones.titulo IS 'Primera pregunta, recortada: así se ve en el historial';
+COMMENT ON COLUMN conversaciones.oculta IS 'Quitada del historial; sus mensajes y métricas se conservan para /admin';
+CREATE INDEX IF NOT EXISTS conversaciones_por_cliente
+    ON conversaciones (cliente_id, actualizada_en DESC) WHERE NOT oculta;
 
 CREATE TABLE IF NOT EXISTS mensajes (
     id               BIGSERIAL PRIMARY KEY,

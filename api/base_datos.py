@@ -28,11 +28,50 @@ async def aplicar_esquema(grupo: AsyncConnectionPool) -> None:
         await conexion.execute(ESQUEMA.read_text(encoding="utf-8"))
 
 
-async def asegurar_conversacion(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID) -> None:
+# Largo máximo del título que se ve en el historial
+LARGO_TITULO = 80
+
+
+async def asegurar_conversacion(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID,
+                                cliente_id: uuid.UUID | None, pregunta: str) -> None:
+    """Crea la conversación (con la pregunta como título) o la marca como recién usada.
+
+    Si una conversación vieja no tenía dueño, la toma el navegador que la siguió: así la
+    conversación que ya estaba abierta antes de existir el historial también aparece en él."""
+    titulo = pregunta if len(pregunta) <= LARGO_TITULO else pregunta[:LARGO_TITULO - 1] + "…"
     async with grupo.connection() as conexion:
         await conexion.execute(
-            "INSERT INTO conversaciones (id) VALUES (%s) ON CONFLICT (id) DO NOTHING",
-            (conversacion_id,))
+            "INSERT INTO conversaciones (id, cliente_id, titulo) VALUES (%s, %s, %s) "
+            "ON CONFLICT (id) DO UPDATE SET actualizada_en = now(), "
+            " cliente_id = COALESCE(conversaciones.cliente_id, EXCLUDED.cliente_id), "
+            # Una conversación de antes del historial no tiene título: se usa su primera pregunta
+            " titulo = COALESCE(conversaciones.titulo, (SELECT left(contenido, %s) FROM mensajes"
+            "  WHERE conversacion_id = EXCLUDED.id AND rol = 'usuario' ORDER BY id LIMIT 1),"
+            "  EXCLUDED.titulo)",
+            (conversacion_id, cliente_id, titulo, LARGO_TITULO))
+
+
+async def conversaciones_de(grupo: AsyncConnectionPool, cliente_id: uuid.UUID, limite: int
+                            ) -> list[dict]:
+    """El historial de un navegador: sus conversaciones visibles, la más reciente primero."""
+    async with grupo.connection() as conexion:
+        return await (await conexion.execute(
+            "SELECT c.id, c.titulo, c.actualizada_en,"
+            " (SELECT count(*) FROM mensajes m WHERE m.conversacion_id = c.id"
+            "  AND m.rol = 'usuario') AS preguntas"
+            " FROM conversaciones c WHERE c.cliente_id = %s AND NOT c.oculta"
+            " ORDER BY c.actualizada_en DESC LIMIT %s", (cliente_id, limite))).fetchall()
+
+
+async def ocultar_conversacion(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID,
+                               cliente_id: uuid.UUID) -> bool:
+    """La quita del historial (solo si es de ese navegador). No borra nada: /admin la sigue
+    contando. Devuelve False si no existe o es de otro navegador."""
+    async with grupo.connection() as conexion:
+        resultado = await conexion.execute(
+            "UPDATE conversaciones SET oculta = true WHERE id = %s AND cliente_id = %s",
+            (conversacion_id, cliente_id))
+        return resultado.rowcount > 0
 
 
 async def guardar_turno(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID, pregunta: str,

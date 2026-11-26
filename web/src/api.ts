@@ -17,6 +17,46 @@ export type Respuesta = {
 
 export type MensajeGuardado = { id: number; rol: 'usuario' | 'agente'; contenido: string; citas: Cita[] }
 
+// --- Historial sin login: cada navegador tiene un id aleatorio y ve solo sus conversaciones ---
+
+const LLAVE_CLIENTE = 'cliente_id'
+let clienteEnMemoria: string | null = null
+
+function uuidAleatorio(): string {
+  // crypto.randomUUID solo existe en páginas seguras (https o localhost); si no, se arma a mano
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
+/** El id de este navegador: se crea la primera vez y se guarda en localStorage. */
+export function clienteId(): string {
+  try {
+    let id = localStorage.getItem(LLAVE_CLIENTE)
+    if (!id) { id = uuidAleatorio(); localStorage.setItem(LLAVE_CLIENTE, id) }
+    return id
+  } catch {
+    // Sin almacenamiento (modo privado estricto): vale solo mientras la página esté abierta
+    return (clienteEnMemoria ??= uuidAleatorio())
+  }
+}
+
+export type ConversacionResumen = { id: string; titulo: string | null; actualizada_en: string; preguntas: number }
+
+export async function listarConversaciones(): Promise<ConversacionResumen[]> {
+  const res = await fetch(`/api/conversaciones?cliente_id=${clienteId()}`)
+  return res.ok ? res.json() : []
+}
+
+/** La quita del historial de este navegador (los datos se conservan para /admin). */
+export async function ocultarConversacion(id: string): Promise<boolean> {
+  const res = await fetch(`/api/conversaciones/${id}?cliente_id=${clienteId()}`, { method: 'DELETE' })
+  return res.ok
+}
+
 type Manejadores = {
   conversacion: (id: string) => void
   buscando: (consulta: string) => void
@@ -31,7 +71,7 @@ export async function preguntar(pregunta: string, conversacionId: string | null,
     res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pregunta, conversacion_id: conversacionId }),
+      body: JSON.stringify({ pregunta, conversacion_id: conversacionId, cliente_id: clienteId() }),
     })
   } catch {
     m.error('No hay conexión con el servidor.')

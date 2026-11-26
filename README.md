@@ -65,6 +65,10 @@ Recorrido de una pregunta:
    texto citado. Con «Ver el texto citado» se despliega el texto exacto de cada fragmento en que se
    basó la respuesta (`GET /api/fragmentos`), para comparar la respuesta con su fuente.
 
+**Historial sin login.** Cada navegador recibe un id aleatorio (en su `localStorage`) y la barra
+lateral muestra solo sus conversaciones, tituladas con la primera pregunta. Quitar una del
+historial la marca como `oculta`: sus mensajes y métricas se conservan para `/admin`.
+
 ### Rol de cada componente
 
 | Componente | Rol |
@@ -299,7 +303,7 @@ erDiagram
     conversaciones ||--o{ mensajes : tiene
     mensajes ||--o| metricas : "si es del agente"
     mensajes ||--o{ citas : "si es del agente"
-    conversaciones { uuid id PK  timestamptz creada_en }
+    conversaciones { uuid id PK  timestamptz creada_en  uuid cliente_id  text titulo  timestamptz actualizada_en  bool oculta }
     mensajes { bigint id PK  uuid conversacion_id FK  text rol  text contenido  timestamptz creado_en }
     metricas { bigint mensaje_id PK  text modelo  int tokens_entrada  int tokens_salida  int llamadas_llm  real segundos_total  real segundos_busqueda  bool se_puede_responder  bool desde_cache  text consulta_en  text_arr tools  text error }
     citas { bigint id PK  bigint mensaje_id FK  text fragmento_id  text seccion  int_arr paginas }

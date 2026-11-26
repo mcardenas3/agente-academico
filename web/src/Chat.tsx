@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { cargarConversacion, cargarFragmentos, preguntar, type Cita, type Fragmento, type Respuesta } from './api'
-import { paginas, numero, tiempo, ultimaSeccion } from './formato'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, MagnifyingGlass, NotePencil, Quotes, Warning,
+  cargarConversacion, cargarFragmentos, listarConversaciones, ocultarConversacion, preguntar,
+  type Cita, type ConversacionResumen, type Fragmento, type Respuesta,
+} from './api'
+import { paginas, numero, tiempo, ultimaSeccion } from './formato'
+import Historial from './Historial'
+import {
+  ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, List, MagnifyingGlass, NotePencil, Quotes, Warning,
 } from './iconos'
 
 type Mensaje =
@@ -32,18 +36,27 @@ export default function Chat() {
   const [conversacion, setConversacion] = useState<string | null>(leerConversacion)
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [historial, setHistorial] = useState<ConversacionResumen[]>([])
+  const [historialAbierto, setHistorialAbierto] = useState(false)  // solo cuenta en celular
   const final = useRef<HTMLDivElement>(null)
   const entrada = useRef<HTMLTextAreaElement>(null)
 
-  // Al abrir, se recupera la conversación anterior (si la hay)
+  const refrescarHistorial = useCallback(() => { listarConversaciones().then(setHistorial) }, [])
+
+  // Pinta una conversación guardada (sus mensajes con sus citas)
+  async function cargar(id: string) {
+    const guardados = await cargarConversacion(id)
+    setMensajes(guardados.map((m) => (m.rol === 'usuario'
+      ? { rol: 'usuario', texto: m.contenido }
+      : { rol: 'agente', texto: m.contenido, citas: m.citas })))
+  }
+
+  // Al abrir, se recupera la última conversación (si la hay) y el historial
   useEffect(() => {
     const id = leerConversacion()
-    if (!id) return
-    cargarConversacion(id).then((guardados) =>
-      setMensajes(guardados.map((m) => (m.rol === 'usuario'
-        ? { rol: 'usuario', texto: m.contenido }
-        : { rol: 'agente', texto: m.contenido, citas: m.citas }))))
-  }, [])
+    if (id) void cargar(id)
+    refrescarHistorial()
+  }, [refrescarHistorial])
 
   useEffect(() => { final.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [mensajes])
 
@@ -64,7 +77,23 @@ export default function Chat() {
       error: (mensaje) => reemplazarUltimo({ rol: 'error', texto: mensaje, pregunta }),
     })
     setOcupado(false)
+    refrescarHistorial()  // la conversación aparece (o sube) en el historial
     entrada.current?.focus()
+  }
+
+  async function abrirConversacion(id: string) {
+    setHistorialAbierto(false)
+    if (ocupado || id === conversacion) return
+    setConversacion(id)
+    guardarConversacion(id)
+    await cargar(id)
+  }
+
+  async function quitarDelHistorial(id: string) {
+    if (!window.confirm('¿Quitar esta conversación del historial?')) return
+    await ocultarConversacion(id)
+    if (id === conversacion) nuevaConversacion()
+    refrescarHistorial()
   }
 
   function reintentar(pregunta: string) {
@@ -77,11 +106,16 @@ export default function Chat() {
     setMensajes([])
     setConversacion(null)
     guardarConversacion(null)
+    setHistorialAbierto(false)
     entrada.current?.focus()
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+    <Historial conversaciones={historial} activa={conversacion} ocupado={ocupado} abierto={historialAbierto}
+      onCerrar={() => setHistorialAbierto(false)} onNueva={nuevaConversacion}
+      onAbrir={(id) => void abrirConversacion(id)} onOcultar={(id) => void quitarDelHistorial(id)} />
+    <div className="flex min-w-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
           {mensajes.length === 0 ? (
@@ -100,8 +134,13 @@ export default function Chat() {
           className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 py-3 sm:px-6"
           onSubmit={(e) => { e.preventDefault(); void enviar(texto) }}
         >
+          {/* En celular, el historial se abre con este botón (en escritorio siempre está visible) */}
+          <button type="button" className="btn btn-ghost h-11 px-3 md:hidden" onClick={() => setHistorialAbierto(true)}
+            title="Historial" aria-label="Abrir historial">
+            <List size={18} weight="bold" />
+          </button>
           {mensajes.length > 0 && (
-            <button type="button" className="btn btn-ghost h-11 px-3" onClick={nuevaConversacion}
+            <button type="button" className="btn btn-ghost h-11 px-3 md:hidden" onClick={nuevaConversacion}
               disabled={ocupado} title="Nueva conversación" aria-label="Nueva conversación">
               <NotePencil size={18} weight="bold" />
             </button>
@@ -126,6 +165,7 @@ export default function Chat() {
           </button>
         </form>
       </div>
+    </div>
     </div>
   )
 }

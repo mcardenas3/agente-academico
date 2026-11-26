@@ -3,7 +3,9 @@
 Rutas:
     POST /api/chat                     pregunta → eventos SSE ("conversacion", "buscando",
                                        "respuesta" o "error")
+    GET  /api/conversaciones?cliente_id=…  historial de un navegador (sin login)
     GET  /api/conversaciones/{id}      mensajes de una conversación, para volver a pintarla
+    DELETE /api/conversaciones/{id}?cliente_id=…  la quita del historial (no borra datos)
     GET  /api/fragmentos?ids=…         texto exacto de los fragmentos citados (hasta 10)
     GET  /articulo.pdf                 el artículo; las citas lo abren en su página (#page=N)
     GET  /api/salud                    estado de cada servicio
@@ -95,6 +97,7 @@ app = FastAPI(title="Agente académico", lifespan=ciclo_de_vida)
 class Pregunta(BaseModel):
     pregunta: str = Field(min_length=1, max_length=1000)
     conversacion_id: uuid.UUID | None = None  # sin id, empieza una conversación nueva
+    cliente_id: uuid.UUID | None = None       # id aleatorio del navegador, para su historial
 
 
 async def turnos_anteriores(request: Request, conversacion_id: uuid.UUID) -> list[Turno]:
@@ -114,7 +117,7 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
     pregunta = entrada.pregunta.strip()
     conversacion_id = entrada.conversacion_id or uuid.uuid4()
     try:
-        await bd.asegurar_conversacion(estado.grupo, conversacion_id)
+        await bd.asegurar_conversacion(estado.grupo, conversacion_id, entrada.cliente_id, pregunta)
         yield ServerSentEvent(event="conversacion", data={"id": str(conversacion_id)})
         turnos = await turnos_anteriores(request, conversacion_id)
 
@@ -154,9 +157,23 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
                        "Intenta de nuevo en un momento.", "detalle": type(error).__name__})
 
 
+@app.get("/api/conversaciones")
+async def historial(request: Request, cliente_id: uuid.UUID,
+                    limite: int = Query(50, ge=1, le=200)) -> list[dict]:
+    """Las conversaciones de un navegador, la más reciente primero (la barra lateral)."""
+    return await bd.conversaciones_de(request.app.state.grupo, cliente_id, limite)
+
+
 @app.get("/api/conversaciones/{conversacion_id}")
 async def conversacion(conversacion_id: uuid.UUID, request: Request) -> list[dict]:
     return await bd.mensajes_de(request.app.state.grupo, conversacion_id)
+
+
+@app.delete("/api/conversaciones/{conversacion_id}", status_code=204)
+async def ocultar(conversacion_id: uuid.UUID, cliente_id: uuid.UUID, request: Request) -> None:
+    """Quita una conversación del historial de su navegador (no borra sus datos)."""
+    if not await bd.ocultar_conversacion(request.app.state.grupo, conversacion_id, cliente_id):
+        raise HTTPException(404, "No existe esa conversación en este navegador")
 
 
 @app.get("/api/fragmentos")
