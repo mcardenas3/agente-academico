@@ -15,8 +15,10 @@ from opensearchpy import OpenSearch, helpers
 # Fragmentos que genera fragmentar.py. La ruta se arma aquí en vez de importarla de fragmentar.py
 # porque importarlo cargaría Docling y transformers, que tardan y gastan RAM
 FRAGMENTOS = Path(__file__).resolve().parent.parent / "datos" / "procesado" / "fragmentos.jsonl"
-# Dirección de OpenSearch (solo escucha en esta computadora)
-URL_OPENSEARCH = "http://localhost:9200"
+# Dirección de OpenSearch (solo escucha en esta computadora).
+# 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no
+# escucha, y espera todo el timeout antes de pasar a 127.0.0.1
+URL_OPENSEARCH = "http://127.0.0.1:9200"
 # Cuántos resultados se revisan por pregunta
 TOP = 10
 # Inicio del id de cada fragmento; le sigue su número con tres dígitos

@@ -17,8 +17,10 @@ from opensearchpy import OpenSearch
 # Fragmentos que genera fragmentar.py; aquí solo se leen sus llaves para comprobar el mapping.
 # La ruta se arma a mano para no importar fragmentar.py, que carga Docling y transformers
 FRAGMENTOS = Path(__file__).resolve().parent.parent / "datos" / "procesado" / "fragmentos.jsonl"
-# Dirección de OpenSearch (solo escucha en esta computadora)
-URL_OPENSEARCH = "http://localhost:9200"
+# Dirección de OpenSearch (solo escucha en esta computadora).
+# 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no
+# escucha, y espera todo el timeout antes de pasar a 127.0.0.1
+URL_OPENSEARCH = "http://127.0.0.1:9200"
 # Nombre del índice
 INDICE = "fragmentos"
 # Tamaño de los vectores de nvidia/Nemotron-3-Embed-1B-BF16 (comprobado con vLLM en la Etapa 2)

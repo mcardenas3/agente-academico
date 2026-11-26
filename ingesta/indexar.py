@@ -17,8 +17,10 @@ from opensearchpy import OpenSearch, helpers
 
 from crear_indice import DIMENSION, FRAGMENTOS, INDICE, URL_OPENSEARCH
 
-# Endpoint de embeddings de vLLM (compatible con la API Embed v2 de Cohere)
-URL_EMBED = "http://localhost:8000/v2/embed"
+# Endpoint de embeddings de vLLM (compatible con la API Embed v2 de Cohere).
+# 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no
+# escucha, y espera todo el timeout antes de pasar a 127.0.0.1
+URL_EMBED = "http://127.0.0.1:8000/v2/embed"
 # Modelo que atiende vLLM (el mismo nombre con el que arranca en docker-compose.yml)
 MODELO = "nvidia/Nemotron-3-Embed-1B-BF16"
 # Cuántos fragmentos se mandan a vLLM en cada petición
