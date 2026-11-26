@@ -142,9 +142,12 @@ services:
   # ---------- ngrok: URL pública HTTPS hacia la app, para la demo ----------
   ngrok:
     image: ngrok/ngrok:3.39.13-alpine           # Versión fija del agente de ngrok
-    command: ["http", "app:8080"]               # Publica el puerto 8080 del servicio "app"
+    entrypoint: ["/bin/sh", "-c"]               # Un shell, para agregar --url solo si hay dominio fijo
+    # Publica el puerto 8080 del servicio "app"; con NGROK_URL usa siempre ese dominio, sin él uno aleatorio
+    command: ["exec ngrok http app:8080 $${NGROK_URL:+--url $$NGROK_URL}"]
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}       # Token de la cuenta de ngrok (en .env)
+      NGROK_URL: ${NGROK_URL:-}                 # Dominio fijo de la cuenta, p. ej. https://algo.ngrok-free.dev (opcional)
     ports:
       - "127.0.0.1:4040:4040"                   # Panel local de ngrok: ahí aparece la URL pública
     depends_on:
