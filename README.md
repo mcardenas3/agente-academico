@@ -335,6 +335,7 @@ evaluacion/     evaluación del agente (25 preguntas + LLM como juez) y sus resu
 experimentos/   experimentos que respaldan cada decisión (tablas, fragmentos, búsqueda, agente)
 datos/          el artículo, los fragmentos y las traducciones de la evaluación
 docs/evidencia/ captura del cuartil Q1
+pruebas/        peticiones de prueba para Ollama (tool calling) y vLLM (un embedding)
 ```
 
 ## Limitaciones
