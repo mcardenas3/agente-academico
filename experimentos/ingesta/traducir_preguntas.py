@@ -1,6 +1,7 @@
 """Traduce al inglés las preguntas en español de la evaluación, con el LLM de Ollama.
 
-Uso (desde la carpeta ingesta, con ollama encendido):  uv run python traducir_preguntas.py
+Uso (desde la carpeta ingesta, con ollama encendido):
+    uv run python ../experimentos/ingesta/traducir_preguntas.py
 
 BM25 compara palabras y el artículo está en inglés, así que con la pregunta en español casi no
 encuentra nada. Este script traduce cada pregunta una vez y guarda el resultado en
@@ -9,14 +10,17 @@ evaluación mide la búsqueda con una traducción fija y revisada, y no depende 
 """
 
 import json
+import sys
 import time
+from pathlib import Path
 
 import httpx
 
 # PREGUNTAS: las preguntas de la evaluación. TRADUCCIONES: el archivo de salida (se sube a
 # GitHub, porque es parte de la evidencia de la evaluación); su ruta se define en
-# evaluar_busqueda.py, que es quien lo lee
-from evaluar_busqueda import PREGUNTAS, TRADUCCIONES
+# evaluar_busqueda.py, que es quien lo lee y vive en esta misma carpeta
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from evaluar_busqueda import PREGUNTAS, TRADUCCIONES  # noqa: E402
 
 # Dirección de Ollama (solo escucha en esta computadora).
 # 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no

@@ -1,13 +1,15 @@
 """Experimento: compara tamaños de fragmento y formatos de tabla antes de elegir uno.
 
-Uso (desde la carpeta ingesta):  uv run python probar_fragmentos.py
+Uso (desde la carpeta ingesta):  uv run python ../experimentos/ingesta/probar_fragmentos.py
 
 Parte el artículo ya limpio (salida de limpiar.py) con el HybridChunker de Docling y, para cada
 combinación de tamaño máximo y formato de tabla, mide cuántos fragmentos salen y de qué tamaño.
 """
 
 import statistics
+import sys
 import time
+from pathlib import Path
 
 from docling_core.transforms.chunker.hierarchical_chunker import (
     ChunkingSerializerProvider,
@@ -18,9 +20,11 @@ from docling_core.types.doc import DoclingDocument
 from transformers import AutoTokenizer
 from transformers.utils import logging as registro_transformers
 
+# Los scripts de la ingesta viven en ingesta/: se agrega esa carpeta a donde Python busca módulos
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ingesta"))
 # El modelo y el formato Markdown se definen en fragmentar.py, que es el que se usa de verdad
-from fragmentar import MODELO_EMBEDDINGS, ProveedorMarkdown
-from limpiar import SALIDA as ARTICULO_LIMPIO
+from fragmentar import MODELO_EMBEDDINGS, ProveedorMarkdown  # noqa: E402
+from limpiar import SALIDA as ARTICULO_LIMPIO  # noqa: E402
 
 # Tamaños máximos de fragmento que se comparan, en tokens
 TAMANOS = [256, 512, 1024]

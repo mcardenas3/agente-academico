@@ -1,7 +1,7 @@
 """Experimento: ¿quién traduce la pregunta al inglés para BM25?
 
 Uso (desde la carpeta api, con opensearch, vllm y ollama encendidos; tarda ~3–6 minutos):
-    uv run python probar_traduccion.py
+    uv run python ../experimentos/agente/probar_traduccion.py
 
 Dos opciones:
 - A. El agente: al llamar buscar_en_articulo escribe él mismo `consulta_en` (lo que hace hoy).
@@ -19,11 +19,11 @@ from pathlib import Path
 
 import httpx
 
-from agente import agente, crear_cliente, Dependencias
-from busqueda import buscar_con_vector
-
-# Las preguntas, las métricas y la traducción B viven en ingesta/ (ver comparar_busqueda.py)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingesta"))
+# El agente vive en api/; las preguntas, las métricas y la traducción B, en experimentos/ingesta/
+RAIZ = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(RAIZ / "api"), str(RAIZ / "experimentos" / "ingesta")]
+from agente import agente, crear_cliente, Dependencias  # noqa: E402
+from busqueda import buscar_con_vector  # noqa: E402
 from evaluar_busqueda import (  # noqa: E402
     PREFIJO_ID, PREGUNTAS, lugar_del_relevante, recall_5, vectorizar_preguntas,
 )

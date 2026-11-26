@@ -101,6 +101,56 @@ services:
       retries: 20
       start_period: 300s                        # Tiempo de gracia largo: la primera vez descarga el modelo antes de cargarlo
 
+  # ---------- Descarga del LLM: corre una vez y termina ----------
+  ollama-modelo:
+    image: ollama/ollama:0.40.17                # La misma imagen de Ollama, usada solo como cliente
+    environment:
+      OLLAMA_HOST: http://ollama:11434          # Le habla al servidor "ollama"; el modelo queda en su volumen
+    entrypoint: ["ollama", "pull", "nemotron-3-nano:4b"]  # Si ya está descargado, solo lo verifica (segundos)
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"                               # Es de una sola vez: no se reinicia al terminar
+
+  # ---------- La aplicación: API de FastAPI + interfaz de React ----------
+  app:
+    build: .                                    # Se construye con el Dockerfile de la raíz
+    environment:
+      # Cada servicio se alcanza por su nombre dentro de la red de Docker
+      URL_BASE_DATOS: "host=postgres port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
+      URL_REDIS: redis://redis:6379/0
+      URL_OPENSEARCH: http://opensearch:9200
+      URL_EMBED: http://vllm:8000/v2/embed
+      URL_OLLAMA: http://ollama:11434/v1
+      ADMIN_TOKEN: ${ADMIN_TOKEN}               # Token del panel /admin (en .env)
+    ports:
+      - "127.0.0.1:8080:8080"                   # La app en http://127.0.0.1:8080, solo local (afuera se entra por ngrok)
+    depends_on:                                 # Arranca cuando todo lo demás ya responde
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      opensearch: { condition: service_healthy }
+      vllm: { condition: service_healthy }
+      ollama: { condition: service_healthy }
+      ollama-modelo: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/salud')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s                        # La primera vez arma el índice (~10 s) y calienta los modelos
+
+  # ---------- ngrok: URL pública HTTPS hacia la app, para la demo ----------
+  ngrok:
+    image: ngrok/ngrok:3.39.13-alpine           # Versión fija del agente de ngrok
+    command: ["http", "app:8080"]               # Publica el puerto 8080 del servicio "app"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}       # Token de la cuenta de ngrok (en .env)
+    ports:
+      - "127.0.0.1:4040:4040"                   # Panel local de ngrok: ahí aparece la URL pública
+    depends_on:
+      app:
+        condition: service_healthy
+
 # Volúmenes con nombre: Docker los administra y sobreviven a "docker compose down"
 # (solo se borran con "docker compose down -v").
 volumes:

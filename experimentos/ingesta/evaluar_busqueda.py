@@ -1,7 +1,7 @@
 """Evaluación de la búsqueda: ¿en qué lugar sale el fragmento correcto con cada método?
 
 Uso (desde la carpeta ingesta, con opensearch y vllm encendidos):
-    uv run python evaluar_busqueda.py
+    uv run python ../experimentos/ingesta/evaluar_busqueda.py
 
 Hace 25 preguntas con cada método de búsqueda en tres condiciones: en inglés, en español y en
 español con la parte BM25 traducida al inglés (las traducciones las genera
@@ -11,13 +11,16 @@ Todo se repite REPETICIONES veces y se reporta el rango, porque los vectores var
 """
 
 import json
+import sys
 from pathlib import Path
 
 import httpx
 from opensearchpy import OpenSearch
 
-from crear_indice import FRAGMENTOS, INDICE, URL_OPENSEARCH
-from indexar import MODELO, URL_EMBED
+# Los scripts de la ingesta viven en ingesta/: se agrega esa carpeta a donde Python busca módulos
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ingesta"))
+from crear_indice import FRAGMENTOS, INDICE, URL_OPENSEARCH  # noqa: E402
+from indexar import MODELO, URL_EMBED  # noqa: E402
 
 # Cuántos resultados se revisan por pregunta
 TOP = 10
@@ -27,7 +30,7 @@ REPETICIONES = 5
 PREFIJO_ID = "huang2026-rag-survey-"
 # Traducciones al inglés de las preguntas en español: {español: inglés}. Las escribe
 # traducir_preguntas.py con el LLM; se guardan para que la evaluación sea repetible
-TRADUCCIONES = Path(__file__).resolve().parent.parent / "datos" / "evaluacion" / "traducciones.json"
+TRADUCCIONES = Path(__file__).resolve().parents[2] / "datos" / "evaluacion" / "traducciones.json"
 
 # Preguntas conceptuales: (inglés, español, fragmentos que la responden). Son las 15 de
 # probar_analizadores.py; los fragmentos correctos se fijaron a mano antes de aquel experimento
@@ -273,7 +276,7 @@ def rango(valores: list, formato: str) -> str:
 def main() -> None:
     if not TRADUCCIONES.exists():
         raise SystemExit(f"No existe {TRADUCCIONES}; córrelo primero: "
-                         "uv run python traducir_preguntas.py")
+                         "uv run python ../experimentos/ingesta/traducir_preguntas.py")
     traducciones = json.loads(TRADUCCIONES.read_text(encoding="utf-8"))
     cliente = OpenSearch(hosts=[URL_OPENSEARCH])
 

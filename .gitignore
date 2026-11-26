@@ -11,9 +11,12 @@
 # Archivos compilados que Python genera solo al ejecutar el código
 __pycache__/
 
-# Lo que produce Docling: se regenera corriendo ingesta/convertir.py
-datos/procesado/
+# Lo que produce Docling: se regenera corriendo ingesta/convertir.py. Los fragmentos sí se suben:
+# con ellos Docker arma el índice sin tener que correr Docling (pesado y solo para Windows aquí)
+datos/procesado/*
+!datos/procesado/fragmentos.jsonl
 
 # Dependencias de la interfaz (se instalan con "npm install") y su versión compilada
 node_modules/
 web/dist/
+*.tsbuildinfo

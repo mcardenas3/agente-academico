@@ -1,6 +1,7 @@
 """Experimento: ¿con qué analizador encuentra mejor BM25 los fragmentos, standard o english?
 
-Uso (desde la carpeta ingesta, con OpenSearch encendido):  uv run python probar_analizadores.py
+Uso (desde la carpeta ingesta, con OpenSearch encendido):
+    uv run python ../experimentos/ingesta/probar_analizadores.py
 
 Crea un índice temporal por configuración (solo con el texto, sin vectores), carga los 268
 fragmentos, hace 15 preguntas en inglés de las que ya se sabe qué fragmento las responde, mide en
@@ -14,7 +15,7 @@ from opensearchpy import OpenSearch, helpers
 
 # Fragmentos que genera fragmentar.py. La ruta se arma aquí en vez de importarla de fragmentar.py
 # porque importarlo cargaría Docling y transformers, que tardan y gastan RAM
-FRAGMENTOS = Path(__file__).resolve().parent.parent / "datos" / "procesado" / "fragmentos.jsonl"
+FRAGMENTOS = Path(__file__).resolve().parents[2] / "datos" / "procesado" / "fragmentos.jsonl"
 # Dirección de OpenSearch (solo escucha en esta computadora).
 # 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no
 # escucha, y espera todo el timeout antes de pasar a 127.0.0.1

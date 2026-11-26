@@ -1,13 +1,15 @@
 """Experimento: compara configuraciones del modelo de tablas de Docling sobre la Tabla 3 (página 23).
 
-Uso (desde la carpeta ingesta):  uv run python probar_tablas.py
+Uso (desde la carpeta ingesta):  uv run python ../experimentos/ingesta/probar_tablas.py
 
 Ronda 1 (2026-11-24): TableFormer v2 descartado; con esta tabla llega a su límite de 512 pasos
 y deja todo el texto en una sola celda.
 """
 
 import re
+import sys
 import time
+from pathlib import Path
 
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
@@ -17,7 +19,9 @@ from docling.datamodel.pipeline_options import (
 )
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
-from convertir import PDF
+# Los scripts de la ingesta viven en ingesta/: se agrega esa carpeta a donde Python busca módulos
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ingesta"))
+from convertir import PDF  # noqa: E402
 
 # Página donde está la Tabla 3; convertir solo esa hace el experimento rápido
 PAGINA = 23

@@ -10,6 +10,7 @@ de cada documento es el id del fragmento.
 
 import json
 import math
+import os
 import time
 
 import httpx
@@ -19,8 +20,9 @@ from crear_indice import DIMENSION, FRAGMENTOS, INDICE, URL_OPENSEARCH
 
 # Endpoint de embeddings de vLLM (compatible con la API Embed v2 de Cohere).
 # 127.0.0.1 y no "localhost": en Windows, Python prueba primero ::1 (IPv6), donde Docker no
-# escucha, y espera todo el timeout antes de pasar a 127.0.0.1
-URL_EMBED = "http://127.0.0.1:8000/v2/embed"
+# escucha, y espera todo el timeout antes de pasar a 127.0.0.1. Dentro de Docker se cambia con
+# la variable de entorno (ahí el servidor se llama "vllm")
+URL_EMBED = os.environ.get("URL_EMBED", "http://127.0.0.1:8000/v2/embed")
 # Modelo que atiende vLLM (el mismo nombre con el que arranca en docker-compose.yml)
 MODELO = "nvidia/Nemotron-3-Embed-1B-BF16"
 # Cuántos fragmentos se mandan a vLLM en cada petición

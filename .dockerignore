@@ -1,0 +1,11 @@
+# Lo que NO se manda a Docker al construir la imagen
+.git
+.env
+**/.venv
+**/__pycache__
+**/node_modules
+web/dist
+.archify
+*.md
+datos/procesado/*
+!datos/procesado/fragmentos.jsonl
