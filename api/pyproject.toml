@@ -1,0 +1,18 @@
+# Ficha del proyecto de la API: el agente que responde preguntas sobre el artículo
+# (separado de ingesta/ para no cargar Docling ni PyTorch)
+[project]
+# Nombre del proyecto
+name = "api"
+# Versión del proyecto
+version = "0.1.0"
+# Solo Python 3.13, igual que ingesta/, para que los dos proyectos usen la misma versión
+requires-python = "==3.13.*"
+# Librerías que necesita el proyecto; se agregan con "uv add"
+dependencies = [
+    # Cliente HTTP para pedir a vLLM el vector de la pregunta
+    "httpx>=0.28.1",
+    # Cliente de OpenSearch para la búsqueda híbrida
+    "opensearch-py>=3.2.0",
+    # Pydantic AI con el grupo "openai": Ollama se usa por su API compatible con OpenAI
+    "pydantic-ai-slim[openai]>=2.75.0",
+]
