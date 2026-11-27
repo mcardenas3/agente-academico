@@ -160,7 +160,7 @@ function Panel({ token, oscuro, onSalir, onCostos }: {
           <Kpi titulo="Aprobadas" valor={pct(a?.aprobadas, a?.auditadas)}
             detalle={`${numero(a?.con_observaciones)} con observaciones · ${numero(a?.reprobadas)} reprobadas`} />
           <Kpi titulo="Fieles al artículo" valor={pct(a?.fieles, a?.auditadas)}
-            detalle={`citas correctas ${pct(a?.citas_correctas, a?.auditadas)} · relevancia ${a?.relevancia_prom != null ? a.relevancia_prom.toFixed(1) : '—'}/5`} />
+            detalle={`responde lo pedido ${pct(a?.responde_lo_pedido, a?.auditadas)} · citas correctas ${pct(a?.citas_correctas, a?.auditadas)} · relevancia ${a?.relevancia_prom != null ? a.relevancia_prom.toFixed(1) : '—'}/5`} />
           <Kpi titulo="Corregidas" valor={numero(r?.corregidas)}
             detalle="Claude las regresó antes de mostrarlas" />
           <Kpi titulo="Costo de Claude" valor={dolares(a?.costo_usd)}

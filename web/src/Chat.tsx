@@ -366,6 +366,11 @@ function Auditado({ estado }: { estado: Auditoria | 'pendiente' | null }) {
             <span className="chip" data-tone={estado.abstencion_correcta ? 'ok' : 'bad'}>
               {estado.abstencion_correcta ? 'Acertó en responder o abstenerse' : 'No acertó en responder o abstenerse'}
             </span>
+            {estado.responde_lo_pedido != null && (
+              <span className="chip" data-tone={estado.responde_lo_pedido ? 'ok' : 'warn'}>
+                {estado.responde_lo_pedido ? 'Responde lo pedido' : 'No responde todo lo pedido'}
+              </span>
+            )}
           </div>
           {estado.problemas.length > 0 && (
             <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-ink-muted">

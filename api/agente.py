@@ -90,11 +90,18 @@ _PALABRAS_EN = {"what", "how", "the", "is", "are", "of", "which", "why", "does",
 # salían en español (2 de 2); con la nota, en inglés (2 de 2). Va en la pregunta y no en las
 # instrucciones porque con cualquier instrucción dinámica el modelo dejaba de buscar (0 de 9)
 NOTA_DE_IDIOMA = {"es": "(Responde en español.)", "en": "(Answer in English.)"}
+# Nota para las preguntas de seguimiento, con el mismo mecanismo. Medido: a "¿Y cuál es su
+# desventaja?" y a "puedes entrar más a fondo en las fases" las buscaba con la pregunta anterior
+# tal cual ("¿Qué es HyDE…?"), y entonces repetía la respuesta anterior
+NOTA_DE_SEGUIMIENTO = ("(This question continues the conversation. When you call "
+                       "buscar_en_articulo, rewrite it as a complete question that names the topic "
+                       "of the previous messages AND what is being asked now.)")
 
 
-def con_nota_de_idioma(pregunta: str) -> str:
-    """La pregunta tal cual, más la nota del idioma en que debe responder."""
-    return f"{pregunta}\n\n{NOTA_DE_IDIOMA[idioma_de(pregunta)]}"
+def con_nota_de_idioma(pregunta: str, seguimiento: bool = False) -> str:
+    """La pregunta tal cual, más la nota de seguimiento (si hay turnos antes) y la del idioma."""
+    notas = [NOTA_DE_SEGUIMIENTO] if seguimiento else []
+    return "\n\n".join([pregunta, *notas, NOTA_DE_IDIOMA[idioma_de(pregunta)]])
 
 
 def idioma_de(texto: str) -> str:
@@ -113,6 +120,8 @@ class Dependencias:
     cliente: OpenSearch
     # La pregunta del usuario tal cual (sin la nota de idioma), para la verificación
     pregunta: str = ""
+    # El turno anterior, para que Claude entienda un seguimiento ("explícalo más a fondo")
+    turno_anterior: "Turno | None" = None
     # Fragmentos que devolvió la búsqueda en esta pregunta, por id: de aquí salen las citas
     fragmentos_vistos: dict[str, Fragmento] = field(default_factory=dict)
     # La primera consulta con que buscó (reescrita completa si era de seguimiento)
@@ -125,6 +134,9 @@ class Dependencias:
     # Todas las verificaciones de esta pregunta (las que regresaron la respuesta también cuestan)
     verificaciones: list[Auditoria] = field(default_factory=list)
     correcciones: int = 0                  # veces que Claude la regresó para corregirla
+    # La respuesta que Claude regresó, con su veredicto: si la corrección sale peor (se abstiene
+    # cuando Claude dijo que sí había con qué responder), se entrega esta
+    previa: "tuple[Respuesta, Auditoria] | None" = None
     error_verificacion: str | None = None  # si Claude no respondió (sin red, sin saldo…)
 
 
@@ -206,6 +218,9 @@ agente = Agent(
         # AI no llega a Ollama con este modelo (no está en su lista de familias conocidas), así
         # que se manda directo el campo que Ollama sí entiende en su API compatible con OpenAI
         extra_body={"reasoning_effort": "none"},
+        # Máximo por llamada al LLM. Sin esto el cliente espera hasta 10 min: medido, una
+        # pregunta de la evaluación se quedó colgada 629 s
+        timeout=90,
     ),
     # Si el LLM se equivoca (argumentos mal formados, no buscó, citó un id ajeno, no citó nada o
     # Claude encontró algo sin respaldo), se le devuelve el error y puede intentar otra vez, hasta
@@ -295,6 +310,26 @@ def niega_el_tema(texto: str) -> bool:
     return len(texto) <= LARGO_MAXIMO_NEGACION and bool(_NIEGA_EL_TEMA.search(texto))
 
 
+# Medido: tras una corrección escribió la respuesta correcta ("La desventaja es… el alto costo
+# computacional") con su cita, pero marcó que no se podía responder, y se mostraba la abstención
+LARGO_MINIMO_RESPUESTA = 60
+
+
+def contesta_aunque_dice_que_no(salida: Respuesta, texto: str) -> bool:
+    """¿Marcó que no se puede responder, pero escribió una respuesta de verdad y la citó?"""
+    return (not salida.se_puede_responder and bool(salida.fragmentos_citados)
+            and len(texto) >= LARGO_MINIMO_RESPUESTA and not _NIEGA_EL_TEMA.search(texto))
+
+
+# Una respuesta completa termina en puntuación (o en una tabla o lista de Markdown). Medido: una
+# corrección se cortó a media palabra ("En la fase post-ri") sin llegar al límite de tokens
+_TERMINA_COMPLETA = re.compile(r"""[.!?…)\]"'»:;|*`]\s*$""")
+
+
+def esta_cortada(texto: str) -> bool:
+    return bool(texto) and not _TERMINA_COMPLETA.search(texto)
+
+
 def _abstencion() -> Respuesta:
     return Respuesta(respuesta="", se_puede_responder=False, fragmentos_citados=[])
 
@@ -307,10 +342,13 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
     1. Tiene que haber buscado.
     2. Solo puede citar fragmentos que la búsqueda de verdad le dio.
     3. Si dice que sí se puede responder, tiene que citar al menos un fragmento.
-    4. Si su respuesta solo dice que el artículo no trata el tema, se toma como abstención.
+    4. La decisión tiene que cuadrar con el texto: si solo dice que el artículo no trata el tema,
+       es abstención; si marca que no se puede pero escribió una respuesta citada, es respuesta.
     5. Tiene que responder en el idioma de la pregunta.
-    6. Claude revisa la respuesta contra los fragmentos. Si afirma algo sin respaldo, cita mal o
-       debió abstenerse, se le regresan los problemas para que la corrija (una vez).
+    6. No puede quedar cortada a media frase.
+    7. Claude revisa la respuesta contra los fragmentos. Si afirma algo sin respaldo, cita mal,
+       debió abstenerse o no hace lo que se pidió, se le regresan los problemas para que la
+       corrija (una vez).
     """
     d = ctx.deps
     vistos = d.fragmentos_vistos
@@ -323,6 +361,8 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
     texto = _IDS_EN_TEXTO.sub("", salida.respuesta).strip()
     if salida.se_puede_responder and niega_el_tema(texto):
         salida = _abstencion()
+    elif contesta_aunque_dice_que_no(salida, texto):
+        salida = salida.model_copy(update={"se_puede_responder": True})
     if salida.se_puede_responder and not salida.fragmentos_citados:
         if ctx.last_attempt:  # sin citas no hay respuesta: mejor abstenerse que inventar
             salida = _abstencion()
@@ -337,13 +377,25 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
         # pregunta en inglés salió en español
         raise ModelRetry("Write `respuesta` in the same language as the user's question. "
                          f"{NOTA_DE_IDIOMA[idioma]}")
+    if salida.se_puede_responder and esta_cortada(texto) and not ctx.last_attempt:
+        raise ModelRetry("Your answer is cut off in the middle of a sentence. Call `responder` "
+                         "again with the complete answer.")
 
     if not d.verificar:
         return salida
+    if d.previa and not salida.se_puede_responder:
+        # Medido: tras una corrección, el modelo a veces se abstiene aunque Claude había dicho que
+        # sí había con qué responder (perdió la respuesta de "recuperación adaptativa"). Se
+        # entrega la respuesta anterior con su veredicto, sin volver a pagarle a Claude
+        salida, d.auditoria = d.previa
+        return salida
+    anterior = d.turno_anterior
     caso = Caso(pregunta=d.pregunta, consulta=d.consulta,
                 respuesta=texto if salida.se_puede_responder else NO_CUBRE[idioma_de(d.pregunta)],
                 se_puede_responder=salida.se_puede_responder,
-                citados=list(dict.fromkeys(salida.fragmentos_citados)))
+                citados=list(dict.fromkeys(salida.fragmentos_citados)),
+                pregunta_anterior=anterior.pregunta if anterior else None,
+                respuesta_anterior=anterior.respuesta if anterior else None)
     try:
         a = await auditar(caso, list(vistos.values()))
     except AuditoriaFallida as error:
@@ -351,24 +403,41 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
         d.error_verificacion = str(error)
         return salida
     d.verificaciones.append(a)
-    # Solo se corrige lo que afirma algo; una abstención no tiene afirmaciones que corregir
-    if (salida.se_puede_responder and tiene_problemas(a)
-            and d.correcciones < MAX_CORRECCIONES and not ctx.last_attempt):
-        d.correcciones += 1
-        problemas = "\n".join(f"- {p}" for p in a.problemas) or f"- {a.resumen}"
-        raise ModelRetry(
-            "An auditor checked your answer against the article fragments and found these "
-            f"problems:\n{problemas}\n\nRewrite the answer using ONLY information that appears in "
-            "the fragments, and list in fragmentos_citados the fragments that support it. If the "
-            "fragments do not contain the answer, set se_puede_responder to false. Keep the "
-            f"language of the user's question. {NOTA_DE_IDIOMA[idioma]}")
     # El veredicto es el de la última revisión; el costo y el tiempo, la suma de todas
     v = d.verificaciones
-    d.auditoria = a.model_copy(update={
+    auditoria = a.model_copy(update={
         "tokens_entrada": sum(x.tokens_entrada for x in v),
         "tokens_salida": sum(x.tokens_salida for x in v),
         "costo_usd": round(sum(x.costo_usd for x in v), 6),
         "segundos": round(sum(x.segundos for x in v), 2)})
+    # Solo se corrige lo que afirma algo; una abstención no tiene afirmaciones que corregir
+    if (salida.se_puede_responder and tiene_problemas(a, seguimiento=anterior is not None)
+            and d.correcciones < MAX_CORRECCIONES and not ctx.last_attempt):
+        d.correcciones += 1
+        # Si Claude dijo que contestar era lo correcto, la corrección no puede terminar en
+        # abstención: se guarda esta respuesta por si acaso
+        if a.abstencion_correcta:
+            d.previa = (salida, auditoria)
+        problemas = "\n".join(f"- {p}" for p in a.problemas) or f"- {a.resumen}"
+        # Medido: a "¿puedes entrar más a fondo en las fases?" repitió la lista de la respuesta
+        # anterior; profundizar necesita buscar cada parte por separado
+        incompleta = ("" if a.responde_lo_pedido else
+                      "Your answer does not do what the user asked (for example, they asked for "
+                      "more detail and you only listed or repeated the previous answer). Call "
+                      "buscar_en_articulo again with a specific query for each part you need to "
+                      "explain, then answer in full.\n\n")
+        # Ofrecer abstenerse solo si Claude dijo que debió hacerlo. Medido: con la frase siempre
+        # presente, el modelo chico se abstenía tras la corrección aunque sí había respuesta
+        abstenerse = ("The fragments do not contain the answer to this question: set "
+                      "se_puede_responder to false. " if not a.abstencion_correcta else
+                      "The fragments DO contain information to answer: keep se_puede_responder "
+                      "true. ")
+        raise ModelRetry(
+            "An auditor checked your answer against the article fragments and found these "
+            f"problems:\n{problemas}\n\n{incompleta}Rewrite the answer using ONLY information that "
+            "appears in the fragments, and list in fragmentos_citados the fragments that support "
+            f"it. {abstenerse}Keep the language of the user's question. {NOTA_DE_IDIOMA[idioma]}")
+    d.auditoria = auditoria
     return salida
 
 
@@ -446,10 +515,11 @@ def preguntar(cliente: OpenSearch, pregunta: str, turnos: list[Turno] | None = N
               verificar: bool = False) -> RespuestaCitada:
     """Hace una pregunta al agente (con los turnos anteriores) y devuelve la respuesta citada.
     Con verificar=True, Claude la revisa antes de entregarla."""
-    dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar)
+    dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar,
+                                turno_anterior=turnos[-1] if turnos else None)
     inicio = time.perf_counter()
     try:
-        resultado = agente.run_sync(con_nota_de_idioma(pregunta), deps=dependencias,
+        resultado = agente.run_sync(con_nota_de_idioma(pregunta, bool(turnos)), deps=dependencias,
                                     message_history=historial_para_el_agente(turnos or []))
     except UnexpectedModelBehavior as error:
         # Se agotaron los reintentos: se responde con el mensaje fijo y se guarda el motivo
@@ -474,12 +544,13 @@ async def preguntar_por_eventos(cliente: OpenSearch, pregunta: str,
                                 verificar: bool = False) -> AsyncIterator[Evento]:
     """Igual que preguntar(), pero va avisando: cuándo busca, cuándo Claude verifica y, al final,
     la respuesta completa. La API los convierte en eventos SSE para la interfaz."""
-    dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar)
+    dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar,
+                                turno_anterior=turnos[-1] if turnos else None)
     inicio = time.perf_counter()
     salida, mensajes, uso, error = None, [], None, None
     intentos = 0  # respuestas que el modelo ha propuesto (la 2.ª es una corrección)
     try:
-        async with agente.iter(con_nota_de_idioma(pregunta), deps=dependencias,
+        async with agente.iter(con_nota_de_idioma(pregunta, bool(turnos)), deps=dependencias,
                                message_history=historial_para_el_agente(turnos or [])) as corrida:
             async for nodo in corrida:
                 # Cada vuelta con tools: se avisa qué pidió el modelo. El nodo llega antes de

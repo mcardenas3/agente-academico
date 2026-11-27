@@ -57,8 +57,14 @@ Revisa:
 Si se abstuvo, es true cuando no citó nada.
 - abstencion_correcta: true si la decisión de contestar o abstenerse fue la correcta según los \
 fragmentos recuperados (contestó y había con qué, o se abstuvo y no había).
-- veredicto: "aprobada" si es fiel, relevante (4–5) y bien citada; "reprobada" si no es fiel o \
-debió hacer lo contrario (contestar o abstenerse); "con_observaciones" en otro caso.
+- responde_lo_pedido: true si la respuesta hace lo que el usuario pidió, también en la forma y \
+el nivel de detalle. Si pide profundizar, explicar cada parte, comparar o dar ejemplos y la \
+respuesta solo enumera o repite la respuesta anterior, es false. En una pregunta de seguimiento, \
+juzga contra lo que pidió el usuario, no solo contra la pregunta reescrita. Una abstención \
+correcta es true.
+- veredicto: "aprobada" si es fiel, relevante (4–5), bien citada y responde lo pedido; \
+"reprobada" si no es fiel o debió hacer lo contrario (contestar o abstenerse); \
+"con_observaciones" en otro caso.
 
 Escribe analisis, problemas y resumen en español, breves y concretos. En problemas pon cada \
 falla en una frase (lista vacía si no hay ninguna). El resumen es una sola frase para el usuario.
@@ -74,6 +80,7 @@ class Veredicto(BaseModel):
     relevancia: Literal[1, 2, 3, 4, 5]
     citas_correctas: bool
     abstencion_correcta: bool
+    responde_lo_pedido: bool
     problemas: list[str] = Field(description="Cada falla concreta en una frase; vacía si no hay.")
     veredicto: Literal["aprobada", "con_observaciones", "reprobada"]
     resumen: str = Field(description="Una frase para el usuario con el resultado de la auditoría.")
@@ -129,12 +136,20 @@ class Caso(BaseModel):
     se_puede_responder: bool
     citados: list[str]             # ids de los fragmentos que citó
     consulta: str | None = None    # la pregunta reescrita completa, si era de seguimiento
+    # El turno anterior de la conversación: para saber qué pide un "explícalo más a fondo" y
+    # notar si el asistente solo repitió lo que ya había dicho
+    pregunta_anterior: str | None = None
+    respuesta_anterior: str | None = None
 
 
 def armar_mensaje(caso: Caso, fragmentos: list[Fragmento]) -> str:
     """El caso a auditar: la pregunta, lo que recibió el asistente y lo que contestó."""
     citados = set(caso.citados)
-    partes = [f"<pregunta>\n{caso.pregunta}\n</pregunta>"]
+    partes = []
+    if caso.pregunta_anterior and caso.respuesta_anterior:
+        partes.append(f"<turno_anterior>\n<pregunta>{caso.pregunta_anterior}</pregunta>\n"
+                      f"<respuesta>{caso.respuesta_anterior}</respuesta>\n</turno_anterior>")
+    partes.append(f"<pregunta>\n{caso.pregunta}\n</pregunta>")
     if caso.consulta and caso.consulta != caso.pregunta:
         # Pregunta de seguimiento: el asistente la reescribió completa para buscar
         partes.append(f"<pregunta_reescrita>\n{caso.consulta}\n</pregunta_reescrita>")
@@ -150,9 +165,14 @@ def armar_mensaje(caso: Caso, fragmentos: list[Fragmento]) -> str:
     return "\n\n".join(partes)
 
 
-def tiene_problemas(a: Veredicto) -> bool:
-    """¿La respuesta afirma algo que no sale de los fragmentos o no debió contestar?"""
-    return a.fidelidad != "fiel" or not a.citas_correctas or not a.abstencion_correcta
+def tiene_problemas(a: Veredicto, seguimiento: bool) -> bool:
+    """¿La respuesta afirma algo que no sale de los fragmentos, cita mal o no debió contestar? En
+    un seguimiento, también si no hace lo que se pidió (p. ej. repetir la lista cuando se pidió
+    profundizar). Medido: contar "no responde lo pedido" también en preguntas directas duplicó
+    las correcciones (5 → 11 de 25) y bajó la calidad: Claude pedía detalle que los fragmentos no
+    tenían."""
+    return (a.fidelidad != "fiel" or not a.citas_correctas or not a.abstencion_correcta
+            or (seguimiento and not a.responde_lo_pedido))
 
 
 async def auditar(caso: Caso, fragmentos: list[Fragmento], modelo: str = MODELO_AUDITOR

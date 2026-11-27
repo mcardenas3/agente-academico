@@ -83,3 +83,5 @@ CREATE TABLE IF NOT EXISTS auditorias (
     creada_en            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE auditorias IS 'Revisión de cada respuesta hecha por Claude contra los fragmentos recuperados';
+ALTER TABLE auditorias ADD COLUMN IF NOT EXISTS responde_lo_pedido BOOLEAN;
+COMMENT ON COLUMN auditorias.responde_lo_pedido IS 'Hace lo que pidió el usuario, también el nivel de detalle (NULL en auditorías de antes de este campo)';

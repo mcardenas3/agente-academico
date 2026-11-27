@@ -29,6 +29,7 @@ export type Auditoria = {
   relevancia: number
   citas_correctas: boolean
   abstencion_correcta: boolean
+  responde_lo_pedido: boolean | null  // null en auditorías de antes de este campo
   problemas: string[]
   resumen: string
   analisis: string
@@ -185,6 +186,7 @@ export type ResumenAuditoria = {
   fieles: number
   citas_correctas: number
   abstencion_correcta: number
+  responde_lo_pedido: number
   relevancia_prom: number | null
   costo_usd: number               // todo lo que se ha gastado en Claude en el periodo
   costo_prom_usd: number | null   // por respuesta verificada (sin contar las de caché)

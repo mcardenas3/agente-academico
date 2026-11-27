@@ -302,12 +302,19 @@ abstenciones incluidas, con los 5 fragmentos recuperados a la vista:
 
 | Criterio (Claude como juez) | Sin candados | **Con candados** |
 |---|---|---|
-| Veredicto | 15 aprobadas · 8 con observaciones · 2 reprobadas | **21 aprobadas** · 4 con observaciones · 0 reprobadas |
-| Fiel a los fragmentos | 21/25 | **22/25** (3 parcialmente fiel, 0 no fiel) |
+| Veredicto | 15 aprobadas · 8 con observaciones · 2 reprobadas | 15 aprobadas · 10 con observaciones · **0 reprobadas** |
+| Fiel a los fragmentos | 21/25 | **24/25** (1 parcialmente fiel, 0 no fiel) |
 | Citas que sostienen la respuesta | 24/25 | **24/25** |
 | Acertó al responder o abstenerse | 23/25 | **25/25** |
-| Relevancia (1–5) | 4.64 | **4.76** |
-| Costo de Claude por corrida | US$0.018 | ~US$0.02 (incluye las verificaciones que regresaron respuestas) |
+| Relevancia (1–5) | 4.64 | 4.32 |
+| Costo de Claude por corrida | US$0.018 | US$0.022 (incluye las verificaciones que regresaron respuestas) |
+
+Con candados, el juez también revisa si la respuesta **hace todo lo que se pidió**. Para aprobar
+ya no basta con ser fiel y estar bien citada, así que «aprobadas» y «relevancia» son más estrictas
+que en la columna de la izquierda y no se comparan directo. Las 10 «con observaciones» son
+respuestas fieles a las que Claude les pide más detalle. En preguntas directas eso no dispara una
+corrección: medido, hacerlo duplicaba las correcciones (de 5 a 11) y hacía que una respuesta
+correcta se perdiera en abstención.
 
 - **Las 2 abstenciones fallidas se arreglaron con código** (candado 4), sin llamar a Claude. El
   agente decía «el artículo no proporciona los resultados de GPT-7…», pero las marcaba como
@@ -341,6 +348,7 @@ un modelo de Pydantic:
 | `relevancia` | Qué tanto responde lo que se preguntó (1 a 5) |
 | `citas_correctas` | Que los fragmentos citados de verdad sostengan la respuesta |
 | `abstencion_correcta` | Que acertara al contestar o al decir que el artículo no lo cubre |
+| `responde_lo_pedido` | Que haga lo que pidió el usuario, también el nivel de detalle (ve el turno anterior para entender un seguimiento) |
 | `veredicto` | `aprobada`, `con_observaciones` o `reprobada`, con la lista de problemas y un resumen |
 
 - **En el chat** aparece como «Aprobada · Verificada por Claude» (o «Con observaciones»,
@@ -368,12 +376,15 @@ intenta de nuevo; la respuesta no sale de la API hasta pasarlos.
 | 1 | Tiene que haber llamado `buscar_en_articulo` | Reintenta: «primero busca» |
 | 2 | Solo puede citar ids que la búsqueda le devolvió | Reintenta con la lista de ids válidos |
 | 3 | Si dice que sí puede responder, cita al menos un fragmento | Reintenta; en el último intento se abstiene: **sin cita no hay respuesta** |
-| 4 | Si su respuesta solo dice «el artículo no menciona…» | Se toma como abstención (así fallaban las 2 de la evaluación) |
+| 4 | La decisión cuadra con el texto | Si solo dice «el artículo no menciona…», es abstención (así fallaban las 2 de la evaluación). Si marca «no se puede» pero escribió una respuesta citada, es respuesta (así se perdía la desventaja de HyDE) |
 | 5 | Responde en el idioma de la pregunta | Reintenta con la nota de idioma (tras una corrección, una respuesta en inglés salía en español) |
-| 6 | Claude verifica la respuesta contra los fragmentos | Si afirma algo sin respaldo, cita mal o debió abstenerse, Claude le regresa la lista de problemas y el agente la corrige (una vez); la versión corregida se vuelve a verificar |
+| 6 | No queda cortada a media frase | Reintenta (una corrección terminó en «En la fase post-ri») |
+| 7 | Claude verifica la respuesta contra los fragmentos | Si afirma algo sin respaldo, cita mal, debió abstenerse o, en un seguimiento, **no hace lo que se pidió** (p. ej. repite la lista cuando se pidió profundizar), Claude le regresa la lista de problemas y el agente la corrige (una vez); la versión corregida se vuelve a verificar. Si la corrección termina en abstención aunque Claude había dicho que sí había con qué responder, se entrega la respuesta anterior con su veredicto |
 
-Los candados 1 a 5 son código y no cuestan nada. El 6 cuesta una llamada a Claude, o dos si hubo
-corrección. También agrega tiempo: ~3 s cuando la respuesta pasa a la primera y ~10 s más cuando
+Los candados 1 a 6 son código y no cuestan nada. El 7 cuesta una llamada a Claude, o dos si hubo
+corrección. En las preguntas de seguimiento, además, la pregunta lleva una nota para que el agente
+la reescriba completa antes de buscar. Antes, a «¿Y cuál es su desventaja?» la buscaba como «¿Qué
+es HyDE…?» y repetía la respuesta anterior. También agrega tiempo: ~3 s cuando la respuesta pasa a la primera y ~10 s más cuando
 hay que corregir. Si después de corregir quedan detalles, la respuesta se muestra con su veredicto
 («Con observaciones») en vez de esconderla. Así queda a la vista lo que Claude encontró.
 
@@ -494,3 +505,7 @@ pruebas/        peticiones de prueba para Ollama (tool calling) y vLLM (un embed
   siguen activos y la respuesta sale con el aviso «Sin verificar con Claude».
 - Verificar antes de mostrar duplica el tiempo promedio (de 5.3 a 11 s). Solo se corrige una vez:
   si después de corregir quedan detalles, se muestran en el veredicto en vez de volver a intentar.
+  Con dos vueltas se probó, y no mejoró: tardó 30 s y llegó a agotar los reintentos.
+- Pedidos que abarcan varias secciones («explica a fondo cada fase») superan al modelo local de
+  4b. Busca y corrige, pero la respuesta queda superficial; Claude la marca «Con observaciones» y
+  dice qué le faltó.

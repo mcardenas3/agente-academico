@@ -109,13 +109,13 @@ async def guardar_auditoria(grupo: AsyncConnectionPool, mensaje_id: int, auditor
     async with grupo.connection() as conexion:
         await conexion.execute(
             "INSERT INTO auditorias (mensaje_id, modelo, veredicto, fidelidad, relevancia,"
-            " citas_correctas, abstencion_correcta, problemas, resumen, analisis, tokens_entrada,"
-            " tokens_salida, costo_usd, segundos, desde_cache)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " citas_correctas, abstencion_correcta, responde_lo_pedido, problemas, resumen,"
+            " analisis, tokens_entrada, tokens_salida, costo_usd, segundos, desde_cache)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
             " ON CONFLICT (mensaje_id) DO NOTHING",
             (mensaje_id, a.modelo, a.veredicto, a.fidelidad, a.relevancia, a.citas_correctas,
-             a.abstencion_correcta, a.problemas, a.resumen, a.analisis, a.tokens_entrada,
-             a.tokens_salida, a.costo_usd, a.segundos, desde_cache))
+             a.abstencion_correcta, a.responde_lo_pedido, a.problemas, a.resumen, a.analisis,
+             a.tokens_entrada, a.tokens_salida, a.costo_usd, a.segundos, desde_cache))
 
 
 # La auditoría de un mensaje como objeto JSON (NULL si no se auditó), para pegarla a cada fila
@@ -123,6 +123,7 @@ _AUDITORIA_JSON = """(
     SELECT json_build_object('veredicto', a.veredicto, 'fidelidad', a.fidelidad,
                              'relevancia', a.relevancia, 'citas_correctas', a.citas_correctas,
                              'abstencion_correcta', a.abstencion_correcta,
+                             'responde_lo_pedido', a.responde_lo_pedido,
                              'problemas', a.problemas, 'resumen', a.resumen,
                              'analisis', a.analisis, 'modelo', a.modelo,
                              'costo_usd', a.costo_usd::float, 'desde_cache', a.desde_cache,
@@ -209,6 +210,7 @@ async def resumen(grupo: AsyncConnectionPool, desde: datetime | None, hasta: dat
                count(*) FILTER (WHERE a.fidelidad = 'fiel')              AS fieles,
                count(*) FILTER (WHERE a.citas_correctas)                 AS citas_correctas,
                count(*) FILTER (WHERE a.abstencion_correcta)             AS abstencion_correcta,
+               count(*) FILTER (WHERE a.responde_lo_pedido)              AS responde_lo_pedido,
                avg(a.relevancia)::float                                  AS relevancia_prom,
                coalesce(sum(a.costo_usd), 0)::float                      AS costo_usd,
                (avg(a.costo_usd) FILTER (WHERE NOT a.desde_cache))::float AS costo_prom_usd,
