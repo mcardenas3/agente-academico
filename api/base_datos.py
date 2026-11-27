@@ -89,11 +89,12 @@ async def guardar_turno(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID, 
         await conexion.execute(
             "INSERT INTO metricas (mensaje_id, modelo, tokens_entrada, tokens_salida, llamadas_llm,"
             " segundos_total, segundos_busqueda, se_puede_responder, desde_cache, consulta_en,"
-            " tools, error) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            " tools, error, correcciones)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (mensaje_id, MODELO_LLM, respuesta.tokens_entrada, respuesta.tokens_salida,
              respuesta.llamadas_llm, respuesta.segundos, respuesta.segundos_busqueda,
              respuesta.se_puede_responder, desde_cache, respuesta.consulta_en,
-             respuesta.tools_llamadas, respuesta.error))
+             respuesta.tools_llamadas, respuesta.error, respuesta.correcciones))
         for cita in respuesta.citas:
             await conexion.execute(
                 "INSERT INTO citas (mensaje_id, fragmento_id, seccion, paginas) "
@@ -124,7 +125,9 @@ _AUDITORIA_JSON = """(
                              'abstencion_correcta', a.abstencion_correcta,
                              'problemas', a.problemas, 'resumen', a.resumen,
                              'analisis', a.analisis, 'modelo', a.modelo,
-                             'costo_usd', a.costo_usd::float, 'desde_cache', a.desde_cache)
+                             'costo_usd', a.costo_usd::float, 'desde_cache', a.desde_cache,
+                             'correcciones', (SELECT x2.correcciones FROM metricas x2
+                                               WHERE x2.mensaje_id = a.mensaje_id))
       FROM auditorias a WHERE a.mensaje_id = m.id) AS auditoria"""
 
 
@@ -193,7 +196,8 @@ async def resumen(grupo: AsyncConnectionPool, desde: datetime | None, hasta: dat
                                                                       AS segundos_llm_prom,
                count(*) FILTER (WHERE x.desde_cache)                  AS desde_cache,
                count(*) FILTER (WHERE NOT x.se_puede_responder)       AS sin_respuesta,
-               count(*) FILTER (WHERE x.error IS NOT NULL)            AS errores
+               count(*) FILTER (WHERE x.error IS NOT NULL)            AS errores,
+               count(*) FILTER (WHERE x.correcciones > 0 AND NOT x.desde_cache) AS corregidas
           FROM mensajes m JOIN metricas x ON x.mensaje_id = m.id
          WHERE m.rol = 'agente' {filtro}"""
     # Lo que dijo el auditor (Claude) en el mismo periodo
@@ -244,7 +248,7 @@ async def lista_de_preguntas(grupo: AsyncConnectionPool, desde: datetime | None,
         SELECT m.id, m.creado_en, m.conversacion_id, p.contenido AS pregunta,
                m.contenido AS respuesta, x.tokens_entrada, x.tokens_salida, x.segundos_total,
                x.segundos_busqueda, x.se_puede_responder, x.desde_cache, x.llamadas_llm,
-               x.tools, x.consulta_en, x.error, x.modelo, {_AUDITORIA_JSON}
+               x.tools, x.consulta_en, x.error, x.modelo, x.correcciones, {_AUDITORIA_JSON}
           FROM mensajes m
           JOIN metricas x ON x.mensaje_id = m.id
           JOIN LATERAL (SELECT contenido FROM mensajes

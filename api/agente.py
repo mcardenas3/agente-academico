@@ -6,6 +6,9 @@
   Las secciones y páginas de las citas no las escribe el LLM: se sacan de los fragmentos que de
   verdad devolvió la búsqueda, para que no pueda inventarlas.
 - Recibe los últimos turnos de la conversación, así entiende preguntas de seguimiento.
+- Candados antes de entregar la respuesta (en revisar_respuesta): tiene que haber buscado, solo
+  puede citar fragmentos que la búsqueda le dio, si contesta tiene que citar al menos uno, y
+  Claude verifica que todo lo que afirma salga de los fragmentos; si no, el agente la corrige.
 """
 
 import os
@@ -27,6 +30,7 @@ from pydantic_ai.messages import (  # noqa: E402
 from pydantic_ai.models.ollama import OllamaModel  # noqa: E402
 from pydantic_ai.providers.ollama import OllamaProvider  # noqa: E402
 
+from auditor import Auditoria, AuditoriaFallida, Caso, auditar, tiene_problemas  # noqa: E402
 from busqueda import (  # noqa: E402
     URL_OPENSEARCH, Fragmento, Referencia, ResultadoReferencias, buscar_fragmentos,
     preparar_pipeline, traer_referencias,
@@ -107,10 +111,19 @@ class Dependencias:
     """Lo que las tools necesitan durante una pregunta. Pydantic AI se lo pasa en ctx.deps."""
 
     cliente: OpenSearch
+    # La pregunta del usuario tal cual (sin la nota de idioma), para la verificación
+    pregunta: str = ""
     # Fragmentos que devolvió la búsqueda en esta pregunta, por id: de aquí salen las citas
     fragmentos_vistos: dict[str, Fragmento] = field(default_factory=dict)
+    # La primera consulta con que buscó (reescrita completa si era de seguimiento)
+    consulta: str | None = None
     # Tiempo dentro de las tools (vectorizar + buscar), para separar búsqueda de LLM en /admin
     segundos_busqueda: float = 0.0
+    # Verificación con Claude antes de entregar la respuesta
+    verificar: bool = False
+    auditoria: Auditoria | None = None     # la de la respuesta que se entregó
+    correcciones: int = 0                  # veces que Claude la regresó para corregirla
+    error_verificacion: str | None = None  # si Claude no respondió (sin red, sin saldo…)
 
 
 class Respuesta(BaseModel):
@@ -164,6 +177,11 @@ class RespuestaCitada(BaseModel):
     # Todos los fragmentos que devolvió la búsqueda (citados o no): el auditor los revisa para
     # saber si había con qué contestar
     recuperados: list[str] = []
+    # Verificación con Claude: "verificada", "fallida" (Claude no respondió) u "omitida" (sin
+    # llave o sobre el tope diario)
+    verificacion: str = "omitida"
+    auditoria: Auditoria | None = None
+    correcciones: int = 0
 
 
 modelo = OllamaModel(MODELO_LLM, provider=OllamaProvider(base_url=URL_OLLAMA))
@@ -187,9 +205,10 @@ agente = Agent(
         # que se manda directo el campo que Ollama sí entiende en su API compatible con OpenAI
         extra_body={"reasoning_effort": "none"},
     ),
-    # Si el LLM se equivoca (argumentos mal formados, no buscó, citó un id ajeno), se le devuelve
-    # el error y puede intentar otra vez, hasta 2 veces
-    retries=2,
+    # Si el LLM se equivoca (argumentos mal formados, no buscó, citó un id ajeno, no citó nada o
+    # Claude encontró algo sin respaldo), se le devuelve el error y puede intentar otra vez, hasta
+    # 3 veces
+    retries=3,
 )
 
 
@@ -232,6 +251,7 @@ def buscar_en_articulo(ctx: RunContext[Dependencias], consulta: str, consulta_en
     numeros = citas_mencionadas(fragmentos, consulta_en)
     referencias = traer_referencias(ctx.deps.cliente, numeros).referencias if numeros else []
     ctx.deps.segundos_busqueda += time.perf_counter() - inicio
+    ctx.deps.consulta = ctx.deps.consulta or consulta
     # Se guardan para convertir después los ids citados en sección y páginas
     for f in fragmentos:
         ctx.deps.fragmentos_vistos[f.id] = f
@@ -253,20 +273,93 @@ def traer_referencias_bibliograficas(ctx: RunContext[Dependencias], numeros: lis
         raise ModelRetry(str(error)) from error
 
 
-@agente.output_validator
-def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) -> Respuesta:
-    """Revisa la respuesta antes de aceptarla; si algo está mal, el modelo lo intenta otra vez.
+# Respuestas que en realidad dicen que el artículo no trata el tema ("El artículo no proporciona
+# los resultados de GPT-7…"). Medido: así fallaron las 2 abstenciones de la evaluación; el
+# modelo lo decía en el texto pero marcaba que sí se podía responder
+_NIEGA_EL_TEMA = re.compile(
+    r"\b(el art[ií]culo|los autores|el texto|el documento|los fragmentos|the article|the authors"
+    r"|the paper|the text|the fragments)\b[^.]{0,40}?\b(no|not|n't)\b[^.]{0,25}?"
+    r"\b(menciona|proporciona|trata|aborda|incluye|presenta|expresa|expresan|contiene|discute"
+    r"|reporta|ofrece|habla|especifica|da|mention|provide|discuss|cover|include|address|report"
+    r"|express|contain|specify|present)", re.IGNORECASE)
+# Solo cuenta si la respuesta es corta: "El artículo no menciona X, pero explica Y…" sí responde
+LARGO_MAXIMO_NEGACION = 250
+# Cuántas veces puede Claude regresar una respuesta para que se corrija
+MAX_CORRECCIONES = 1
 
-    Hace cumplir en código dos reglas que el modelo podría saltarse: buscar antes de responder y
-    citar solo fragmentos que la búsqueda de verdad le dio.
+
+def niega_el_tema(texto: str) -> bool:
+    """¿La respuesta solo dice que el artículo no trata lo que se preguntó?"""
+    return len(texto) <= LARGO_MAXIMO_NEGACION and bool(_NIEGA_EL_TEMA.search(texto))
+
+
+def _abstencion() -> Respuesta:
+    return Respuesta(respuesta="", se_puede_responder=False, fragmentos_citados=[])
+
+
+@agente.output_validator
+async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) -> Respuesta:
+    """Los candados antes de entregar una respuesta. Si algo falla, se le explica al modelo y lo
+    intenta otra vez (ModelRetry); así no puede contestar con algo que no salga del artículo.
+
+    1. Tiene que haber buscado.
+    2. Solo puede citar fragmentos que la búsqueda de verdad le dio.
+    3. Si dice que sí se puede responder, tiene que citar al menos un fragmento.
+    4. Si su respuesta solo dice que el artículo no trata el tema, se toma como abstención.
+    5. Tiene que responder en el idioma de la pregunta.
+    6. Claude revisa la respuesta contra los fragmentos. Si afirma algo sin respaldo, cita mal o
+       debió abstenerse, se le regresan los problemas para que la corrija (una vez).
     """
-    vistos = ctx.deps.fragmentos_vistos
+    d = ctx.deps
+    vistos = d.fragmentos_vistos
     if not vistos:
         raise ModelRetry("You must call buscar_en_articulo before answering.")
     ajenos = [i for i in salida.fragmentos_citados if i not in vistos]
     if ajenos:
         raise ModelRetry(f"These ids were not returned by the search: {ajenos}. "
                          f"Cite only ids from this list: {list(vistos)}.")
+    texto = _IDS_EN_TEXTO.sub("", salida.respuesta).strip()
+    if salida.se_puede_responder and niega_el_tema(texto):
+        salida = _abstencion()
+    if salida.se_puede_responder and not salida.fragmentos_citados:
+        if ctx.last_attempt:  # sin citas no hay respuesta: mejor abstenerse que inventar
+            salida = _abstencion()
+        else:
+            raise ModelRetry(
+                "Your answer must be based on the fragments: list in fragmentos_citados the ids "
+                "of the fragments that support it. If the fragments do not contain the answer, "
+                "set se_puede_responder to false.")
+    idioma = idioma_de(d.pregunta)
+    if salida.se_puede_responder and idioma_de(texto) != idioma and not ctx.last_attempt:
+        # Medido: tras una corrección (los problemas vienen en español), una respuesta a una
+        # pregunta en inglés salió en español
+        raise ModelRetry("Write `respuesta` in the same language as the user's question. "
+                         f"{NOTA_DE_IDIOMA[idioma]}")
+
+    if not d.verificar:
+        return salida
+    caso = Caso(pregunta=d.pregunta, consulta=d.consulta,
+                respuesta=texto if salida.se_puede_responder else NO_CUBRE[idioma_de(d.pregunta)],
+                se_puede_responder=salida.se_puede_responder,
+                citados=list(dict.fromkeys(salida.fragmentos_citados)))
+    try:
+        a = await auditar(caso, list(vistos.values()))
+    except AuditoriaFallida as error:
+        # Claude no respondió: se entrega sin verificar (la interfaz lo dice) en vez de no responder
+        d.error_verificacion = str(error)
+        return salida
+    # Solo se corrige lo que afirma algo; una abstención no tiene afirmaciones que corregir
+    if (salida.se_puede_responder and tiene_problemas(a)
+            and d.correcciones < MAX_CORRECCIONES and not ctx.last_attempt):
+        d.correcciones += 1
+        problemas = "\n".join(f"- {p}" for p in a.problemas) or f"- {a.resumen}"
+        raise ModelRetry(
+            "An auditor checked your answer against the article fragments and found these "
+            f"problems:\n{problemas}\n\nRewrite the answer using ONLY information that appears in "
+            "the fragments, and list in fragmentos_citados the fragments that support it. If the "
+            "fragments do not contain the answer, set se_puede_responder to false. Keep the "
+            f"language of the user's question. {NOTA_DE_IDIOMA[idioma]}")
+    d.auditoria = a
     return salida
 
 
@@ -333,13 +426,18 @@ def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[Mod
         segundos_busqueda=round(dependencias.segundos_busqueda, 2),
         error=error,
         recuperados=list(vistos),
+        verificacion=("verificada" if dependencias.auditoria else
+                      "fallida" if dependencias.verificar else "omitida"),
+        auditoria=dependencias.auditoria,
+        correcciones=dependencias.correcciones,
     )
 
 
-def preguntar(cliente: OpenSearch, pregunta: str, turnos: list[Turno] | None = None
-              ) -> RespuestaCitada:
-    """Hace una pregunta al agente (con los turnos anteriores) y devuelve la respuesta citada."""
-    dependencias = Dependencias(cliente=cliente)
+def preguntar(cliente: OpenSearch, pregunta: str, turnos: list[Turno] | None = None,
+              verificar: bool = False) -> RespuestaCitada:
+    """Hace una pregunta al agente (con los turnos anteriores) y devuelve la respuesta citada.
+    Con verificar=True, Claude la revisa antes de entregarla."""
+    dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar)
     inicio = time.perf_counter()
     try:
         resultado = agente.run_sync(con_nota_de_idioma(pregunta), deps=dependencias,
@@ -363,22 +461,32 @@ class Evento:
 
 
 async def preguntar_por_eventos(cliente: OpenSearch, pregunta: str,
-                                turnos: list[Turno] | None = None) -> AsyncIterator[Evento]:
-    """Igual que preguntar(), pero va avisando: cuándo busca, qué encontró y, al final, la
-    respuesta completa. La API los convierte en eventos SSE para la interfaz."""
-    dependencias = Dependencias(cliente=cliente)
+                                turnos: list[Turno] | None = None,
+                                verificar: bool = False) -> AsyncIterator[Evento]:
+    """Igual que preguntar(), pero va avisando: cuándo busca, cuándo Claude verifica y, al final,
+    la respuesta completa. La API los convierte en eventos SSE para la interfaz."""
+    dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar)
     inicio = time.perf_counter()
     salida, mensajes, uso, error = None, [], None, None
+    intentos = 0  # respuestas que el modelo ha propuesto (la 2.ª es una corrección)
     try:
         async with agente.iter(con_nota_de_idioma(pregunta), deps=dependencias,
                                message_history=historial_para_el_agente(turnos or [])) as corrida:
             async for nodo in corrida:
-                # Cada vuelta con tools: se avisa qué pidió el modelo y qué encontró
+                # Cada vuelta con tools: se avisa qué pidió el modelo. El nodo llega antes de
+                # ejecutarse, así que "verificando" sale justo antes de que Claude revise
                 if Agent.is_call_tools_node(nodo):
                     for parte in nodo.model_response.parts:
-                        if parte.part_kind == "tool-call" and parte.tool_name != "responder":
+                        if parte.part_kind != "tool-call":
+                            continue
+                        if parte.tool_name != "responder":
                             yield Evento("buscando", {"tool": parte.tool_name,
                                                       "argumentos": parte.args_as_dict()})
+                        elif verificar:
+                            intentos += 1
+                            # correcciones > 0: esta respuesta corrige lo que Claude regresó
+                            yield Evento("verificando", {
+                                "intento": intentos, "correcciones": dependencias.correcciones})
             salida = corrida.result.output
             mensajes = corrida.result.new_messages()
             uso = corrida.result.usage

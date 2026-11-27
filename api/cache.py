@@ -5,8 +5,9 @@
    su respuesta depende de lo que se habló antes.
 2. Historial reciente. Los últimos turnos de cada conversación, para no ir a PostgreSQL en cada
    pregunta. Si no están (expiraron o Redis se reinició), se leen de PostgreSQL.
-3. Auditorías. Junto a cada respuesta en caché va su auditoría: si la respuesta se repite, no se
-   le vuelve a pagar a Claude por revisarla. Y un contador por día pone tope a lo que se gasta.
+3. Auditorías. Cada respuesta en caché lleva dentro su auditoría (RespuestaCitada.auditoria): si
+   la respuesta se repite, no se le vuelve a pagar a Claude. Y un contador por día pone tope a lo
+   que se gasta.
 """
 
 import hashlib
@@ -19,7 +20,6 @@ from datetime import date
 from redis.asyncio import Redis
 
 from agente import MODELO_LLM, TURNOS_DE_MEMORIA, RespuestaCitada, Turno
-from auditor import MODELO_AUDITOR, Auditoria
 
 URL_REDIS = os.environ.get("URL_REDIS", "redis://127.0.0.1:6379/0")
 # Cuánto dura una respuesta en caché: un día. Si se vuelve a indexar el artículo o cambia el
@@ -55,21 +55,6 @@ async def guardar_respuesta(redis: Redis, pregunta: str, respuesta: RespuestaCit
     if respuesta.error is None:
         await redis.set(llave_respuesta(pregunta), respuesta.model_dump_json(),
                         ex=DURACION_RESPUESTA)
-
-
-def _llave_auditoria(pregunta: str) -> str:
-    """Incluye el modelo auditor: si se cambia de modelo, las auditorías viejas no se reusan."""
-    return f"auditoria:{MODELO_AUDITOR}:{llave_respuesta(pregunta).removeprefix('respuesta:')}"
-
-
-async def leer_auditoria(redis: Redis, pregunta: str) -> Auditoria | None:
-    guardada = await redis.get(_llave_auditoria(pregunta))
-    return Auditoria.model_validate_json(guardada) if guardada else None
-
-
-async def guardar_auditoria(redis: Redis, pregunta: str, auditoria: Auditoria) -> None:
-    """Dura lo mismo que la respuesta a la que corresponde."""
-    await redis.set(_llave_auditoria(pregunta), auditoria.model_dump_json(), ex=DURACION_RESPUESTA)
 
 
 async def contar_auditoria_del_dia(redis: Redis) -> int:

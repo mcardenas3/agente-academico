@@ -5,8 +5,8 @@ Uso (desde la carpeta api, con OpenSearch encendido; no usa Ollama; ~US$0.40 con
     uv run --env-file ../.env python ../evaluacion/comparar_auditores.py claude-haiku-5-5 claude-opus-5-5
 
 Los dos modelos auditan exactamente los mismos casos, con los mismos fragmentos:
-- Las 25 respuestas reales de la evaluación (evaluacion/resultados_agente.json). Se sabe cuáles
-  2 debieron abstenerse y no lo hicieron.
+- Las 25 respuestas reales de la evaluación de antes de los candados
+  (resultados_agente_sin_candados.json). Se sabe cuáles 2 debieron abstenerse y no lo hicieron.
 - 8 respuestas echadas a perder a propósito, donde se sabe que hay un error:
     · 4 con la respuesta de OTRA pregunta (debe reprobarlas por irrelevantes);
     · 4 con un dato inventado agregado al final (debe notar que ya no son fieles).
@@ -22,9 +22,12 @@ from pathlib import Path
 CARPETA = Path(__file__).resolve().parent
 sys.path.insert(0, str(CARPETA.parent / "api"))
 
-from agente import Cita, RespuestaCitada, crear_cliente  # noqa: E402
-from auditor import ACTIVO, AuditoriaFallida, auditar  # noqa: E402
+from agente import crear_cliente  # noqa: E402
+from auditor import ACTIVO, AuditoriaFallida, Caso, auditar  # noqa: E402
 from busqueda import traer_fragmentos  # noqa: E402
+
+# Las respuestas de antes de los candados (sin corrección), para que haya errores que detectar
+RESPUESTAS = CARPETA / "resultados_agente_sin_candados.json"
 
 MODELOS = sys.argv[1:3] if len(sys.argv) >= 3 else ["claude-haiku-5-5", "claude-sonnet-5-5"]
 
@@ -40,16 +43,12 @@ INVENTADAS = [
 ]
 
 
-def respuesta_de(fila: dict, texto: str | None = None, citas: list[str] | None = None
-                 ) -> RespuestaCitada:
-    respondio = fila["decision_correcta"] == (fila["tipo"] != "no responde")
-    return RespuestaCitada(
+def respuesta_de(fila: dict, texto: str | None = None, citas: list[str] | None = None) -> Caso:
+    return Caso(
+        pregunta=fila["pregunta"],
         respuesta=texto if texto is not None else fila["respuesta"],
-        se_puede_responder=respondio,
-        citas=[Cita(id=i, seccion="", paginas=[]) for i in (citas if citas is not None
-                                                            else fila["citas"])],
-        consulta=None, consulta_en=None, tools_llamadas=[], llamadas_llm=0, tokens_entrada=0,
-        tokens_salida=0, segundos=0, segundos_busqueda=0, recuperados=fila["recuperados"])
+        se_puede_responder=fila["decision_correcta"] == (fila["tipo"] != "no responde"),
+        citados=citas if citas is not None else fila["citas"])
 
 
 def armar_casos(filas: list[dict]) -> list[dict]:
@@ -88,8 +87,7 @@ async def correr(modelo: str, casos: list[dict], fragmentos: dict[str, list]) ->
     async def uno(caso):
         async with limite:
             try:
-                a = await auditar(caso["pregunta"], caso["respuesta"], fragmentos[caso["caso"]],
-                                  modelo=modelo)
+                a = await auditar(caso["respuesta"], fragmentos[caso["caso"]], modelo=modelo)
             except AuditoriaFallida as error:
                 print(f"  {modelo} · {caso['caso']}: no se pudo ({error})", flush=True)
                 return None
@@ -130,9 +128,9 @@ def resumir(modelo: str, casos: list[dict], auditorias: list[dict | None]) -> di
 def main() -> None:
     if not ACTIVO:
         sys.exit("Falta CLAUDE_API_KEY: corre con  uv run --env-file ../.env python …")
-    filas = json.loads((CARPETA / "resultados_agente.json").read_text(encoding="utf-8"))["preguntas"]
+    filas = json.loads(RESPUESTAS.read_text(encoding="utf-8"))["preguntas"]
     if any("recuperados" not in f for f in filas):
-        sys.exit("resultados_agente.json no trae 'recuperados': corre antes evaluar_agente.py")
+        sys.exit(f"{RESPUESTAS.name} no trae 'recuperados'")
     casos = armar_casos(filas)
     cliente = crear_cliente()
     fragmentos = {c["caso"]: traer_fragmentos(cliente, c["recuperados"]) for c in casos}

@@ -1,13 +1,15 @@
 """Auditor de respuestas con Claude (API de Anthropic).
 
-Después de que el agente local responde, Claude revisa la respuesta contra los fragmentos que de
-verdad devolvió la búsqueda: si todo lo que afirma está en ellos, si las citas la sostienen, si
-responde lo que se preguntó y si debió contestar o decir que el artículo no lo cubre.
+Antes de que la respuesta del agente local llegue al usuario, Claude la revisa contra los
+fragmentos que de verdad devolvió la búsqueda: si todo lo que afirma está en ellos, si las citas
+la sostienen, si responde lo que se preguntó y si debió contestar o decir que el artículo no lo
+cubre. Si encuentra algo sin respaldo, el agente corrige su respuesta (ver agente.py).
 
 Corre en la nube, así que no ocupa RAM ni GPU de la máquina. Se activa solo si hay llave en
-.env (ANTHROPIC_API_KEY o CLAUDE_API_KEY); sin llave, el chat funciona igual, sin auditoría.
+.env (ANTHROPIC_API_KEY o CLAUDE_API_KEY); sin llave, el chat funciona igual, sin verificación.
 """
 
+import asyncio
 import os
 import time
 from typing import Literal
@@ -15,7 +17,6 @@ from typing import Literal
 from anthropic import APIConnectionError, APIStatusError, AsyncAnthropic
 from pydantic import BaseModel, Field
 
-from agente import RespuestaCitada
 from busqueda import Fragmento
 
 # Haiku por defecto: en evaluacion/comparar_auditores.py detectó los mismos errores que Sonnet
@@ -93,14 +94,19 @@ class AuditoriaFallida(Exception):
 
 
 _cliente: AsyncAnthropic | None = None
+_bucle: asyncio.AbstractEventLoop | None = None
 
 
 def _cliente_api() -> AsyncAnthropic:
-    """Un solo cliente para toda la API (reusa conexiones). Reintenta 2 veces los errores
-    pasajeros (429, 5xx, red) y no espera más de 60 s por respuesta."""
-    global _cliente
-    if _cliente is None:
+    """Un solo cliente por bucle de asyncio (reusa conexiones). En la API siempre es el mismo
+    bucle; los scripts de evaluación corren varios (run_sync, asyncio.run) y las conexiones de
+    un bucle cerrado no sirven en otro. Reintenta 2 veces los errores pasajeros (429, 5xx, red)
+    y no espera más de 60 s por respuesta."""
+    global _cliente, _bucle
+    bucle = asyncio.get_running_loop()
+    if _cliente is None or _bucle is not bucle:
         _cliente = AsyncAnthropic(api_key=_LLAVE, timeout=60, max_retries=2)
+        _bucle = bucle
     return _cliente
 
 
@@ -114,27 +120,42 @@ def _fragmento_xml(f: Fragmento, citado: bool) -> str:
             f'citado="{"sí" if citado else "no"}">\n{f.texto}\n</fragmento>')
 
 
-def armar_mensaje(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fragmento]) -> str:
+class Caso(BaseModel):
+    """Lo que se audita: la pregunta y lo que contestó el asistente (texto tal como se muestra)."""
+
+    pregunta: str
+    respuesta: str
+    se_puede_responder: bool
+    citados: list[str]             # ids de los fragmentos que citó
+    consulta: str | None = None    # la pregunta reescrita completa, si era de seguimiento
+
+
+def armar_mensaje(caso: Caso, fragmentos: list[Fragmento]) -> str:
     """El caso a auditar: la pregunta, lo que recibió el asistente y lo que contestó."""
-    citados = {c.id for c in respuesta.citas}
-    partes = [f"<pregunta>\n{pregunta}\n</pregunta>"]
-    if respuesta.consulta and respuesta.consulta != pregunta:
+    citados = set(caso.citados)
+    partes = [f"<pregunta>\n{caso.pregunta}\n</pregunta>"]
+    if caso.consulta and caso.consulta != caso.pregunta:
         # Pregunta de seguimiento: el asistente la reescribió completa para buscar
-        partes.append(f"<pregunta_reescrita>\n{respuesta.consulta}\n</pregunta_reescrita>")
+        partes.append(f"<pregunta_reescrita>\n{caso.consulta}\n</pregunta_reescrita>")
     if fragmentos:
         partes.append("<fragmentos_recuperados>\n"
                       + "\n".join(_fragmento_xml(f, f.id in citados) for f in fragmentos)
                       + "\n</fragmentos_recuperados>")
     else:
-        partes.append("<fragmentos_recuperados>(el asistente no buscó)</fragmentos_recuperados>")
-    estado = "contestó" if respuesta.se_puede_responder else "se abstuvo"
-    partes.append(f"<respuesta_del_asistente decision=\"{estado}\">\n{respuesta.respuesta}\n"
+        partes.append("<fragmentos_recuperados>(ninguno)</fragmentos_recuperados>")
+    estado = "contestó" if caso.se_puede_responder else "se abstuvo"
+    partes.append(f"<respuesta_del_asistente decision=\"{estado}\">\n{caso.respuesta}\n"
                   "</respuesta_del_asistente>")
     return "\n\n".join(partes)
 
 
-async def auditar(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fragmento],
-                  modelo: str = MODELO_AUDITOR) -> Auditoria:
+def tiene_problemas(a: Veredicto) -> bool:
+    """¿La respuesta afirma algo que no sale de los fragmentos o no debió contestar?"""
+    return a.fidelidad != "fiel" or not a.citas_correctas or not a.abstencion_correcta
+
+
+async def auditar(caso: Caso, fragmentos: list[Fragmento], modelo: str = MODELO_AUDITOR
+                  ) -> Auditoria:
     """Pide a Claude el veredicto de una respuesta. Lanza AuditoriaFallida si no se pudo."""
     if not ACTIVO:
         raise AuditoriaFallida("Falta la llave de la API de Claude en .env")
@@ -147,7 +168,7 @@ async def auditar(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fr
             # Esfuerzo explícito: "medium" basta para comparar una respuesta con 5 fragmentos
             output_config={"effort": "medium"},
             system=INSTRUCCIONES,
-            messages=[{"role": "user", "content": armar_mensaje(pregunta, respuesta, fragmentos)}],
+            messages=[{"role": "user", "content": armar_mensaje(caso, fragmentos)}],
             output_format=Veredicto,
         )
     except APIStatusError as error:  # 400 sin saldo, 401 llave, 429 límite, 5xx…

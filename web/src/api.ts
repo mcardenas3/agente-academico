@@ -14,7 +14,12 @@ export type Respuesta = {
   desde_cache: boolean
   error: string | null
   mensaje_id: number
-  auditando: boolean  // true = después llega la auditoría de Claude
+  // Claude verifica antes de mostrar: 'verificada' (trae auditoria), 'fallida' (Claude no
+  // respondió), 'omitida' (tope diario) o 'inactiva' (sin llave de Claude)
+  verificacion: 'verificada' | 'fallida' | 'omitida' | 'inactiva'
+  auditoria: Auditoria | null
+  correcciones: number  // veces que Claude la regresó para corregirla
+  auditando: boolean    // true = respuesta vieja de caché: su auditoría llega después
 }
 
 /** El veredicto de Claude sobre una respuesta, revisada contra los fragmentos recuperados. */
@@ -30,6 +35,7 @@ export type Auditoria = {
   modelo: string
   costo_usd: number
   desde_cache: boolean
+  correcciones?: number
 }
 
 export type MensajeGuardado = {
@@ -79,6 +85,8 @@ export async function ocultarConversacion(id: string): Promise<boolean> {
 type Manejadores = {
   conversacion: (id: string) => void
   buscando: (consulta: string) => void
+  // Claude revisa la respuesta antes de mostrarla; correcciones > 0 = esta ya es la corregida
+  verificando: (intento: number, correcciones: number) => void
   respuesta: (r: Respuesta) => void
   error: (mensaje: string) => void
   // Llega después de la respuesta: el veredicto, o null si no se pudo auditar
@@ -123,6 +131,7 @@ export async function preguntar(pregunta: string, conversacionId: string | null,
       const d = JSON.parse(datos)
       if (evento === 'conversacion') m.conversacion(d.id)
       else if (evento === 'buscando') m.buscando(d.argumentos?.consulta_en ?? '')
+      else if (evento === 'verificando') m.verificando(d.intento, d.correcciones)
       else if (evento === 'respuesta') { m.respuesta(d); terminado = true }
       else if (evento === 'error') { m.error(d.mensaje); terminado = true }
       else if (evento === 'auditoria') m.auditoria(d.mensaje_id, d)
@@ -164,6 +173,7 @@ export type Resumen = {
   desde_cache: number
   sin_respuesta: number
   errores: number
+  corregidas: number
   auditoria: ResumenAuditoria
 }
 
@@ -198,6 +208,7 @@ export type FilaPregunta = {
   consulta_en: string | null
   error: string | null
   modelo: string
+  correcciones: number
   auditoria: Auditoria | null
 }
 

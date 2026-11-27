@@ -16,7 +16,7 @@ type EstadoAuditoria = Auditoria | 'pendiente' | null | undefined
 type Mensaje =
   | { rol: 'usuario'; texto: string }
   | { rol: 'agente'; id?: number; texto: string; citas: Cita[]; meta?: Respuesta; auditoria?: EstadoAuditoria }
-  | { rol: 'pensando'; busqueda: string | null }
+  | { rol: 'pensando'; busqueda: string | null; verificando?: { intento: number; correcciones: number } }
   | { rol: 'error'; texto: string; pregunta: string }
 
 const SUGERENCIAS = [
@@ -27,6 +27,14 @@ const SUGERENCIAS = [
 ]
 
 const LLAVE_CONVERSACION = 'conversacion_id'
+
+/** Qué mostrar de la verificación de Claude al llegar una respuesta. */
+function estadoAuditoria(r: Respuesta): EstadoAuditoria {
+  if (r.auditoria) return { ...r.auditoria, correcciones: r.correcciones }
+  if (r.auditando) return 'pendiente'
+  if (r.verificacion === 'inactiva') return undefined
+  return null  // Claude no respondió o se llegó al tope diario: se muestra como "sin verificar"
+}
 
 function leerConversacion() {
   try { return localStorage.getItem(LLAVE_CONVERSACION) } catch { return null }
@@ -90,9 +98,14 @@ export default function Chat() {
     await preguntar(pregunta, conversacion, {
       conversacion: (id) => { setConversacion(id); guardarConversacion(id) },
       buscando: (consulta) => reemplazarUltimo({ rol: 'pensando', busqueda: consulta }),
+      verificando: (intento, correcciones) => setMensajes((ms) => {
+        const ultimo = ms[ms.length - 1]
+        const busqueda = ultimo?.rol === 'pensando' ? ultimo.busqueda : null
+        return [...ms.slice(0, -1), { rol: 'pensando', busqueda, verificando: { intento, correcciones } }]
+      }),
       respuesta: (r) => {
         reemplazarUltimo({ rol: 'agente', id: r.mensaje_id, texto: r.respuesta, citas: r.citas, meta: r,
-          auditoria: r.auditando ? 'pendiente' : undefined })
+          auditoria: estadoAuditoria(r) })
         liberar()
       },
       error: (mensaje) => reemplazarUltimo({ rol: 'error', texto: mensaje, pregunta }),
@@ -224,16 +237,33 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
   }
 
   if (m.rol === 'pensando') {
+    const v = m.verificando
     return (
       <div className="flex flex-col gap-1.5 text-meta text-ink-muted" aria-live="polite">
-        {m.busqueda === null ? (
+        {m.busqueda === null && !v ? (
           <Paso activo icono={<MagnifyingGlass size={14} weight="bold" />}>Buscando en el artículo</Paso>
         ) : (
           <>
-            <Paso icono={<Check size={14} weight="bold" />}>
-              Buscó: <span className="text-ink">“{m.busqueda}”</span>
-            </Paso>
-            <Paso activo icono={<NotePencil size={14} weight="bold" />}>Redactando la respuesta</Paso>
+            {m.busqueda !== null && (
+              <Paso icono={<Check size={14} weight="bold" />}>
+                Buscó: <span className="text-ink">“{m.busqueda}”</span>
+              </Paso>
+            )}
+            {!v && <Paso activo icono={<NotePencil size={14} weight="bold" />}>Redactando la respuesta</Paso>}
+            {v && v.correcciones === 0 && (
+              <>
+                <Paso icono={<Check size={14} weight="bold" />}>Redactó la respuesta</Paso>
+                <Paso activo icono={<ShieldCheck size={14} weight="bold" />}>Claude está verificando que todo salga del artículo</Paso>
+              </>
+            )}
+            {v && v.correcciones > 0 && (
+              <>
+                <Paso icono={<ShieldWarning size={14} weight="bold" className="text-[var(--amber-11)]" />}>
+                  Claude encontró afirmaciones sin respaldo y la regresó para corregir
+                </Paso>
+                <Paso activo icono={<ShieldCheck size={14} weight="bold" />}>Verificando la respuesta corregida</Paso>
+              </>
+            )}
           </>
         )}
       </div>
@@ -309,19 +339,20 @@ function Auditado({ estado }: { estado: Auditoria | 'pendiente' | null }) {
   if (estado === null) {
     return (
       <p className="inline-flex items-center gap-1.5 text-micro text-ink-faint">
-        <ShieldWarning size={13} weight="bold" /> No se pudo auditar esta respuesta
+        <ShieldWarning size={13} weight="bold" /> Sin verificar con Claude
       </p>
     )
   }
 
   const v = VEREDICTOS[estado.veredicto]
   const Icono = estado.veredicto === 'aprobada' ? ShieldCheck : ShieldWarning
+  const corregida = (estado.correcciones ?? 0) > 0
   return (
     <div>
       <button onClick={() => setAbierto((a) => !a)} aria-expanded={abierto}
-        className="inline-flex items-center gap-1.5 text-micro font-semibold text-ink-muted hover:text-ink">
+        className="inline-flex flex-wrap items-center gap-1.5 text-left text-micro font-semibold text-ink-muted hover:text-ink">
         <span className="chip" data-tone={v.tono}><Icono size={12} weight="bold" /> {v.texto}</span>
-        Auditada por Claude
+        Verificada por Claude{corregida ? ' · corregida antes de mostrarse' : ''}
         <CaretDown size={11} weight="bold" className={`transition-transform ${abierto ? 'rotate-180' : ''}`} />
       </button>
       {abierto && (
@@ -348,6 +379,7 @@ function Auditado({ estado }: { estado: Auditoria | 'pendiente' | null }) {
           )}
           <p className="m-0 text-micro text-ink-faint">
             Revisión hecha con {estado.modelo} contra los fragmentos que recuperó la búsqueda
+            {corregida ? `, después de que el agente corrigió lo que Claude le regresó` : ''}
             {estado.desde_cache ? ' · reusada de la caché' : ''}
           </p>
         </div>

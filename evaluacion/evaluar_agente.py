@@ -15,14 +15,16 @@ Criterios por pregunta (se calculan solos):
 - decisión correcta: dijo que se puede responder si y solo si el artículo lo cubre.
 - cita correcta: entre sus citas está al menos un fragmento que de verdad responde la pregunta.
 - idioma correcto: respondió en el idioma de la pregunta.
-Y un juez: el mismo auditor de la API (Claude, api/auditor.py), con todos los fragmentos que
-recuperó la búsqueda a la vista, califica las 25 (también las abstenciones):
+El agente corre igual que en la API: con los candados de revisar_respuesta y la verificación de
+Claude antes de entregar (si Claude encuentra algo sin respaldo, el agente corrige). El veredicto
+final de esa verificación queda como juez de las 25 (también las abstenciones):
 - veredicto: aprobada / con observaciones / reprobada.
 - fidelidad: todo lo que afirma la respuesta está en los fragmentos (fiel / parcial / no fiel).
 - relevancia: qué tanto responde lo que se preguntó (1 a 5).
 - citas correctas y si acertó en responder o abstenerse.
-Antes el juez era el mismo modelo local; se cambió a Claude para no juzgar al modelo con él mismo
-y para no cargar la RAM con una segunda ronda de llamadas a Ollama.
+Ojo: ese juez es el mismo que guió la corrección, así que los criterios calculados solos son la
+medida independiente. La corrida de antes de los candados quedó en
+resultados_agente_sin_candados.json, para comparar.
 
 Guarda todo en evaluacion/resultados_agente.json y muestra la tabla y el resumen.
 """
@@ -35,8 +37,8 @@ from pathlib import Path
 CARPETA = Path(__file__).resolve().parent
 sys.path.insert(0, str(CARPETA.parent / "api"))
 
-from agente import Cita, RespuestaCitada, crear_cliente, idioma_de, preguntar  # noqa: E402
-from auditor import ACTIVO, MODELO_AUDITOR, AuditoriaFallida, auditar  # noqa: E402
+from agente import RespuestaCitada, crear_cliente, idioma_de, preguntar  # noqa: E402
+from auditor import ACTIVO, MODELO_AUDITOR, Auditoria, AuditoriaFallida, Caso, auditar  # noqa: E402
 from busqueda import traer_fragmentos  # noqa: E402
 
 PREFIJO = "huang2026-rag-survey-"
@@ -75,19 +77,18 @@ PREGUNTAS: list[tuple[str, list[int]]] = [
 ]
 
 
-# Un solo bucle de asyncio para todas las auditorías: el cliente de Anthropic guarda sus
-# conexiones y no se pueden reusar en otro bucle (asyncio.run crea uno nuevo cada vez)
-BUCLE = asyncio.new_event_loop()
-
-
-def auditar_fila(cliente, fila: dict, respuesta: RespuestaCitada) -> dict:
-    """Le pide a Claude su veredicto sobre una respuesta y lo agrega a la fila."""
-    fragmentos = traer_fragmentos(cliente, respuesta.recuperados) if respuesta.recuperados else []
-    try:
-        a = BUCLE.run_until_complete(auditar(fila["pregunta"], respuesta, fragmentos))
-    except AuditoriaFallida as error:
-        print(f"    no se pudo auditar: {error}", flush=True)
-        return fila
+def auditar_fila(cliente, fila: dict, ya: Auditoria | None = None) -> dict:
+    """Agrega a la fila el veredicto de Claude: el de la verificación (ya) o uno nuevo."""
+    a = ya
+    if a is None:
+        ids = fila.get("recuperados") or fila["citas"]
+        caso = Caso(pregunta=fila["pregunta"], respuesta=fila["respuesta"],
+                    se_puede_responder=respondio(fila), citados=fila["citas"])
+        try:
+            a = asyncio.run(auditar(caso, traer_fragmentos(cliente, ids) if ids else []))
+        except AuditoriaFallida as error:
+            print(f"    no se pudo auditar: {error}", flush=True)
+            return fila
     return fila | {
         "auditoria_veredicto": a.veredicto, "auditoria_fidelidad": a.fidelidad,
         "auditoria_relevancia": a.relevancia, "auditoria_citas_correctas": a.citas_correctas,
@@ -97,18 +98,12 @@ def auditar_fila(cliente, fila: dict, respuesta: RespuestaCitada) -> dict:
     }
 
 
-def respuesta_guardada(fila: dict) -> RespuestaCitada:
-    """Rearma lo necesario para auditar una fila ya guardada (sin volver a correr el agente)."""
-    respondio = fila.get("respondio")
-    if respondio is None:  # filas guardadas antes de este campo: se deduce de la decisión
-        respondio = fila["decision_correcta"] == (fila["tipo"] != "no responde")
-    return RespuestaCitada(
-        respuesta=fila["respuesta"], se_puede_responder=respondio,
-        # Al auditor solo le sirve el id de cada cita (para marcar cuáles fragmentos se citaron)
-        citas=[Cita(id=i, seccion="", paginas=[]) for i in fila["citas"]],
-        consulta=None, consulta_en=None, tools_llamadas=[], llamadas_llm=0, tokens_entrada=0,
-        tokens_salida=0, segundos=0, segundos_busqueda=0,
-        recuperados=fila.get("recuperados") or fila["citas"])
+def respondio(fila: dict) -> bool:
+    """Si el agente dijo que el artículo sí permite responder."""
+    if "respondio" in fila:
+        return fila["respondio"]
+    # Filas guardadas antes de este campo: se deduce de la decisión
+    return fila["decision_correcta"] == (fila["tipo"] != "no responde")
 
 
 def main() -> None:
@@ -118,7 +113,7 @@ def main() -> None:
     salida = CARPETA / "resultados_agente.json"
     if "--solo-auditoria" in sys.argv:
         guardado = json.loads(salida.read_text(encoding="utf-8"))["preguntas"]
-        resultados = [auditar_fila(cliente, f, respuesta_guardada(f)) for f in guardado]
+        resultados = [auditar_fila(cliente, f) for f in guardado]
         for f in resultados:
             print(f"{f['n']:>2}. {f.get('auditoria_veredicto', '-')} | {f['pregunta'][:60]}",
                   flush=True)
@@ -127,7 +122,7 @@ def main() -> None:
 
     resultados = []
     for k, (pregunta, relevantes) in enumerate(PREGUNTAS, start=1):
-        r = preguntar(cliente, pregunta)
+        r: RespuestaCitada = preguntar(cliente, pregunta, verificar=True)
         citados = [c.id for c in r.citas]
         esperados = {f"{PREFIJO}{n:03d}" for n in relevantes}
         fila = {
@@ -147,13 +142,15 @@ def main() -> None:
             "tokens_entrada": r.tokens_entrada,
             "tokens_salida": r.tokens_salida,
             "error": r.error,
+            "verificacion": r.verificacion,
+            "correcciones": r.correcciones,
         }
-        fila = auditar_fila(cliente, fila, r)
+        fila = auditar_fila(cliente, fila, r.auditoria)
         resultados.append(fila)
         print(f"{k:>2}. {'✓' if fila['decision_correcta'] else '✗'} decisión  "
               f"cita={fila['cita_correcta']}  idioma={'✓' if fila['idioma_correcto'] else '✗'}  "
               f"claude={fila.get('auditoria_veredicto', '-')}/{fila.get('auditoria_relevancia', '-')}"
-              f"  {r.segundos:.1f}s | {pregunta[:50]}", flush=True)
+              f"  correcciones={r.correcciones}  {r.segundos:.1f}s | {pregunta[:45]}", flush=True)
     resumir(resultados, salida)
 
 
@@ -189,6 +186,8 @@ def resumir(resultados: list[dict], salida: Path) -> None:
         "claude: relevancia promedio": round(sum(f["auditoria_relevancia"] for f in auditadas)
                                              / max(n, 1), 2),
         "claude: costo total (US$)": round(sum(f["auditoria_costo_usd"] for f in auditadas), 4),
+        "corregidas antes de mostrarse": f"{sum(f.get('correcciones', 0) > 0 for f in resultados)}"
+                                         f"/{len(resultados)}",
         "segundos promedio": round(sum(f["segundos"] for f in resultados) / len(resultados), 2),
         "tokens de entrada promedio": round(sum(f["tokens_entrada"] for f in resultados)
                                             / len(resultados)),

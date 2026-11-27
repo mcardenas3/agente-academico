@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS metricas (
     error               TEXT                    -- si el modelo no logró una respuesta válida
 );
 COMMENT ON TABLE metricas IS 'Lo que costó cada respuesta del agente: tokens, tiempos y caché';
+ALTER TABLE metricas ADD COLUMN IF NOT EXISTS correcciones INTEGER NOT NULL DEFAULT 0;
+COMMENT ON COLUMN metricas.correcciones IS 'Veces que Claude regresó la respuesta para corregirla antes de mostrarla';
 
 CREATE TABLE IF NOT EXISTS citas (
     id           BIGSERIAL PRIMARY KEY,

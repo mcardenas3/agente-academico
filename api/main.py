@@ -2,8 +2,8 @@
 
 Rutas:
     POST /api/chat                     pregunta → eventos SSE ("conversacion", "buscando",
-                                       "respuesta" o "error"; después de la respuesta,
-                                       "auditoria", "auditoria_omitida" o "auditoria_error")
+                                       "verificando" (Claude revisa antes de mostrar),
+                                       "respuesta" (ya con su auditoría) o "error")
     GET  /api/conversaciones?cliente_id=…  historial de un navegador (sin login)
     GET  /api/conversaciones/{id}      mensajes de una conversación, para volver a pintarla
     DELETE /api/conversaciones/{id}?cliente_id=…  la quita del historial (no borra datos)
@@ -131,31 +131,46 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
         if not turnos:
             guardada = await cache.leer_respuesta(estado.redis, pregunta)
             if guardada:
-                # Se registra lo que costó de verdad esta vez: sin LLM y casi sin tiempo
+                # Se registra lo que costó de verdad esta vez: sin LLM, sin Claude y casi sin tiempo
                 respuesta = guardada.model_copy(update={
                     "segundos": round(time.perf_counter() - inicio, 3), "segundos_busqueda": 0.0,
-                    "tokens_entrada": 0, "tokens_salida": 0, "llamadas_llm": 0})
+                    "tokens_entrada": 0, "tokens_salida": 0, "llamadas_llm": 0,
+                    "auditoria": guardada.auditoria and guardada.auditoria.model_copy(update={
+                        "tokens_entrada": 0, "tokens_salida": 0, "costo_usd": 0.0,
+                        "segundos": 0.0})})
                 desde_cache = True
 
-        # 2. Si no, el agente: se reenvían sus avisos de búsqueda conforme ocurren
+        # 2. Si no, el agente. Claude verifica la respuesta ANTES de que salga de aquí (y el
+        # agente la corrige si hace falta); se reenvían los avisos conforme ocurren
         if respuesta is None:
-            async for evento in preguntar_por_eventos(estado.opensearch, pregunta, turnos):
-                if evento.tipo == "buscando":
-                    yield ServerSentEvent(event="buscando", data=evento.datos)
+            verificar = auditor.ACTIVO and await hay_cupo_de_auditoria(estado)
+            async for evento in preguntar_por_eventos(estado.opensearch, pregunta, turnos,
+                                                      verificar=verificar):
+                if evento.tipo in ("buscando", "verificando"):
+                    yield ServerSentEvent(event=evento.tipo, data=evento.datos)
                 elif evento.tipo == "final":
                     respuesta = RespuestaCitada(**evento.datos)
             if not turnos:
                 await cache.guardar_respuesta(estado.redis, pregunta, respuesta)
 
-        # 3. Se guarda todo y se manda la respuesta
+        # 3. Se guarda todo y se manda la respuesta, ya con su verificación
         mensaje_id = await bd.guardar_turno(estado.grupo, conversacion_id, pregunta, respuesta,
                                             desde_cache)
+        if respuesta.auditoria:
+            await bd.guardar_auditoria(estado.grupo, mensaje_id, respuesta.auditoria, desde_cache)
         await cache.guardar_historial(estado.redis, conversacion_id,
                                       turnos + [Turno(pregunta=pregunta,
                                                       respuesta=respuesta.respuesta)])
+        # Respuestas guardadas en caché antes de que hubiera verificación: se auditan después
+        auditar_despues = auditor.ACTIVO and desde_cache and respuesta.auditoria is None
         yield ServerSentEvent(event="respuesta", data={
-            **respuesta.model_dump(), "desde_cache": desde_cache, "mensaje_id": mensaje_id,
-            "auditando": auditor.ACTIVO})
+            **respuesta.model_dump(exclude={"auditoria"}), "desde_cache": desde_cache,
+            "mensaje_id": mensaje_id, "auditando": auditar_despues,
+            # "inactiva" = sin llave de Claude: la interfaz no muestra nada de verificación
+            "verificacion": respuesta.verificacion if auditor.ACTIVO else "inactiva",
+            "auditoria": ({**respuesta.auditoria.model_dump(), "desde_cache": desde_cache,
+                           "correcciones": respuesta.correcciones}
+                          if respuesta.auditoria else None)})
     except Exception as error:  # un servicio caído: se le avisa a la interfaz en vez de colgarse
         registro.exception("Falló /api/chat")
         yield ServerSentEvent(event="error", data={
@@ -163,37 +178,42 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
                        "Intenta de nuevo en un momento.", "detalle": type(error).__name__})
         return
 
-    # 4. Claude audita la respuesta. Va después de mandarla: el usuario ya la está leyendo
-    if auditor.ACTIVO:
-        yield await auditar_turno(estado, pregunta, respuesta, mensaje_id, desde_cache,
-                                  cacheable=not turnos)
+    if auditar_despues:
+        yield await auditar_despues_de_mostrar(estado, pregunta, respuesta, mensaje_id,
+                                               cacheable=not turnos)
 
 
-async def auditar_turno(estado, pregunta: str, respuesta: RespuestaCitada, mensaje_id: int,
-                        desde_cache: bool, cacheable: bool) -> ServerSentEvent:
-    """Pide (o reusa) la auditoría de una respuesta, la guarda y arma el evento SSE.
+async def hay_cupo_de_auditoria(estado) -> bool:
+    """Cuenta una verificación más y dice si todavía cabe en el tope diario."""
+    return await cache.contar_auditoria_del_dia(estado.redis) <= LIMITE_AUDITORIAS_DIA
+
+
+async def auditar_despues_de_mostrar(estado, pregunta: str, respuesta: RespuestaCitada,
+                                     mensaje_id: int, cacheable: bool) -> ServerSentEvent:
+    """Audita una respuesta de caché que no traía auditoría, la guarda y arma el evento SSE.
 
     Nunca lanza: si algo falla, la respuesta ya se mandó y solo se avisa que no hubo auditoría."""
     try:
-        # Respuesta repetida desde la caché: su auditoría también está guardada, no se paga otra
-        guardada = await cache.leer_auditoria(estado.redis, pregunta) if desde_cache else None
-        if guardada:
-            auditoria = guardada.model_copy(update={
-                "tokens_entrada": 0, "tokens_salida": 0, "costo_usd": 0.0, "segundos": 0.0})
-        else:
-            if await cache.contar_auditoria_del_dia(estado.redis) > LIMITE_AUDITORIAS_DIA:
-                return ServerSentEvent(event="auditoria_omitida", data={
-                    "mensaje_id": mensaje_id, "motivo": "Se alcanzó el límite diario de auditorías."})
-            # Respuestas viejas en caché no traen "recuperados": se audita contra lo que citaron
-            ids = respuesta.recuperados or [c.id for c in respuesta.citas]
-            fragmentos = (await asyncio.to_thread(traer_fragmentos, estado.opensearch, ids)
-                          if ids else [])
-            auditoria = await auditor.auditar(pregunta, respuesta, fragmentos)
-            if cacheable and respuesta.error is None:
-                await cache.guardar_auditoria(estado.redis, pregunta, auditoria)
-        await bd.guardar_auditoria(estado.grupo, mensaje_id, auditoria, desde_cache=bool(guardada))
+        if not await hay_cupo_de_auditoria(estado):
+            return ServerSentEvent(event="auditoria_omitida", data={
+                "mensaje_id": mensaje_id, "motivo": "Se alcanzó el límite diario de auditorías."})
+        # Respuestas viejas en caché no traen "recuperados": se audita contra lo que citaron
+        citados = [c.id for c in respuesta.citas]
+        ids = respuesta.recuperados or citados
+        fragmentos = (await asyncio.to_thread(traer_fragmentos, estado.opensearch, ids)
+                      if ids else [])
+        auditoria = await auditor.auditar(auditor.Caso(
+            pregunta=pregunta, respuesta=respuesta.respuesta, citados=citados,
+            se_puede_responder=respuesta.se_puede_responder, consulta=respuesta.consulta),
+            fragmentos)
+        if cacheable and respuesta.error is None:
+            # La respuesta en caché se queda con su auditoría: la próxima vez no se paga
+            await cache.guardar_respuesta(estado.redis, pregunta, respuesta.model_copy(
+                update={"auditoria": auditoria, "verificacion": "verificada"}))
+        await bd.guardar_auditoria(estado.grupo, mensaje_id, auditoria, desde_cache=False)
         return ServerSentEvent(event="auditoria", data={
-            **auditoria.model_dump(), "mensaje_id": mensaje_id, "desde_cache": bool(guardada)})
+            **auditoria.model_dump(), "mensaje_id": mensaje_id, "desde_cache": False,
+            "correcciones": 0})
     except auditor.AuditoriaFallida as error:
         registro.warning("No se pudo auditar el mensaje %s: %s", mensaje_id, error)
     except Exception:

@@ -1,9 +1,9 @@
 # Agente académico
 
 Agente que responde preguntas sobre un artículo científico, con la sección y la página de donde sale
-cada respuesta. Cada respuesta la audita después Claude (API de Anthropic) contra los fragmentos
-recuperados. Tiene un chat en React, un panel `/admin` con estadísticas, y todo el sistema levanta
-con un solo `docker compose up`.
+cada respuesta. Antes de mostrar una respuesta, Claude (API de Anthropic) verifica que salga de los
+fragmentos recuperados; si no, el agente la corrige. Tiene un chat en React, un panel `/admin` con
+estadísticas, y todo el sistema levanta con un solo `docker compose up`.
 
 **Artículo:** Huang, Y. y Huang, J. X. (2026). *A Survey on Retrieval-Augmented Text Generation for
 Large Language Models*. **ACM Computing Surveys** 58(12), artículo 300, pp. 1–38.
@@ -40,7 +40,7 @@ flowchart LR
     G -->|búsqueda híbrida| S[(OpenSearch<br/>BM25 + k-NN)]
     A -->|conversaciones, mensajes,<br/>métricas y citas| P[(PostgreSQL)]
     A -->|caché de respuestas<br/>e historial reciente| R[(Redis)]
-    A -->|auditoría después<br/>de responder| C[API de Claude<br/>claude-haiku-5-5]
+    G -->|verifica antes<br/>de responder| C[API de Claude<br/>claude-haiku-5-5]
     H[Hugging Face Hub] -. pesos .-> V
     subgraph ingesta [Ingesta · una sola vez]
         PDF[PDF] --> D[Docling] --> F[fragmentos.jsonl]
@@ -59,15 +59,18 @@ Recorrido de una pregunta:
    inglés y vectores sobre la original. Devuelve los 5 mejores fragmentos y, si la pregunta nombra
    un estudio citado («REALM [48]»), su ficha de la bibliografía.
 5. El LLM responde llamando la tool `responder`, con una salida tipada: texto, si el artículo lo
-   cubre y qué fragmentos usó. Un validador revisa que haya buscado y que no cite fragmentos que
-   la búsqueda no le dio.
-6. La API convierte los fragmentos citados en sección y páginas, guarda todo en PostgreSQL y
-   manda la respuesta por SSE. Mientras tanto, la interfaz muestra en vivo qué se está buscando.
-7. Cada cita es un enlace que abre el PDF del artículo (`/articulo.pdf#page=N`) en la página del
+   cubre y qué fragmentos usó.
+6. Antes de entregarla, la respuesta pasa por los
+   [candados del validador](#candados-antes-de-responder). Tiene que haber buscado, solo puede
+   citar fragmentos que la búsqueda le dio, y si contesta debe citar al menos uno. Al final,
+   Claude verifica que todo lo que afirma salga de los fragmentos; si no, se la regresa al
+   agente para que la corrija.
+7. La API convierte los fragmentos citados en sección y páginas, guarda todo en PostgreSQL y
+   manda la respuesta por SSE con su veredicto. Mientras tanto, la interfaz muestra en vivo qué se
+   está buscando, cuándo Claude verifica y si hubo que corregir.
+8. Cada cita es un enlace que abre el PDF del artículo (`/articulo.pdf#page=N`) en la página del
    texto citado. Con «Ver el texto citado» se despliega el texto exacto de cada fragmento en que se
    basó la respuesta (`GET /api/fragmentos`), para comparar la respuesta con su fuente.
-8. Ya con la respuesta en pantalla, Claude la audita contra los 5 fragmentos recuperados y su
-   veredicto llega por el mismo SSE (ver [Auditor con Claude](#auditor-con-claude)).
 
 **Historial sin login.** Cada navegador recibe un id aleatorio (en su `localStorage`) y la barra
 lateral muestra solo sus conversaciones, tituladas con la primera pregunta. Quitar una del
@@ -276,50 +279,57 @@ Son 25 preguntas:
 - 5 que el artículo **no** responde.
 
 Los resultados completos, pregunta por pregunta, están en
-[`evaluacion/resultados_agente.json`](evaluacion/resultados_agente.json).
+[`evaluacion/resultados_agente.json`](evaluacion/resultados_agente.json). La corrida de antes de
+los [candados](#candados-antes-de-responder) quedó en
+[`resultados_agente_sin_candados.json`](evaluacion/resultados_agente_sin_candados.json).
 
 ```bash
 cd api && uv run --env-file ../.env python ../evaluacion/evaluar_agente.py
 ```
 
-| Criterio (calculado solo) | Resultado |
-|---|---|
-| Buscó en el artículo antes de responder | **25/25** |
-| Respondió las que el artículo sí cubre | **20/20** |
-| Citó al menos un fragmento correcto (fijado de antemano) | **20/20** |
-| Respondió en el idioma de la pregunta | **25/25** |
-| Se abstuvo en las que el artículo no cubre | **3/5** |
-| Tiempo promedio por pregunta | 5.3 s |
+| Criterio (calculado solo) | Sin candados | **Con candados** |
+|---|---|---|
+| Buscó en el artículo antes de responder | 25/25 | **25/25** |
+| Respondió las que el artículo sí cubre | 20/20 | **20/20** |
+| Citó al menos un fragmento correcto (fijado de antemano) | 20/20 | **20/20** |
+| Respondió en el idioma de la pregunta | 25/25 | **25/25** |
+| Se abstuvo en las que el artículo no cubre | 3/5 | **5/5** |
+| Respuestas corregidas antes de mostrarse | — | 5/25 |
+| Tiempo promedio por pregunta | 5.3 s | 11.0 s |
 
 El juez es el [auditor](#auditor-con-claude) (`claude-haiku-5-5`). Califica las 25 respuestas,
 abstenciones incluidas, con los 5 fragmentos recuperados a la vista:
 
-| Criterio (Claude como juez) | Resultado |
-|---|---|
-| Veredicto | **15 aprobadas** · 8 con observaciones · 2 reprobadas |
-| Fiel a los fragmentos | **21/25** · 4 parcialmente fiel · 0 no fiel |
-| Citas que sostienen la respuesta | **24/25** |
-| Acertó al responder o abstenerse | **23/25** |
-| Relevancia (1–5) | **4.64** |
-| Costo de las 25 auditorías | US$0.018 |
+| Criterio (Claude como juez) | Sin candados | **Con candados** |
+|---|---|---|
+| Veredicto | 15 aprobadas · 8 con observaciones · 2 reprobadas | **21 aprobadas** · 4 con observaciones · 0 reprobadas |
+| Fiel a los fragmentos | 21/25 | **22/25** (3 parcialmente fiel, 0 no fiel) |
+| Citas que sostienen la respuesta | 24/25 | **24/25** |
+| Acertó al responder o abstenerse | 23/25 | **25/25** |
+| Relevancia (1–5) | 4.64 | **4.76** |
+| Costo de Claude por corrida | US$0.018 | ~US$0.02 (incluye las verificaciones que regresaron respuestas) |
 
-- **El juez coincide con los criterios automáticos.** Claude no sabe cuáles preguntas están fuera
-  del artículo, y aun así reprobó justo las 2 abstenciones fallidas (GPT-7 en MMLU y las
-  criptomonedas). Su «acertó al responder o abstenerse» da 23/25, igual que el criterio calculado.
-  En esas dos, el agente sí dijo que el artículo no trata el tema, pero las marcó como respondibles.
-- Las 8 «con observaciones» son detalles: una frase que generaliza un ejemplo (FLARE como si fuera
-  toda la recuperación adaptativa), un término que no aparece en los fragmentos, o una lista con
-  repetidos. Ninguna respuesta contradice al artículo.
-- Antes, el juez era el mismo LLM local de 4b. Ese juez calificaba 17/20 como fieles, pero solo
-  revisaba las 20 respuestas, no las abstenciones, y se juzgaba a sí mismo. Con salida JSON forzada
-  calificaba todo como «no» y 1. Pasar a Claude da un juez independiente y más capaz, y no carga
-  la RAM con una segunda ronda de llamadas a Ollama.
+- **Las 2 abstenciones fallidas se arreglaron con código** (candado 4), sin llamar a Claude. El
+  agente decía «el artículo no proporciona los resultados de GPT-7…», pero las marcaba como
+  respondibles.
+- **Claude regresó 5 respuestas** que tenían afirmaciones sin respaldo. Por ejemplo, una
+  describía a RQ-RAG como algo que «simplifica» la consulta, cuando el artículo dice que la
+  reescribe, descompone y aclara. Las 5 se corrigieron antes de mostrarse. Las 4 que quedan «con
+  observaciones» tienen detalles menores y se muestran con su veredicto.
+- **El costo es tiempo.** El promedio sube de 5.3 a 11 s: la verificación agrega ~3 s y cada
+  corrección otros ~10 s.
+- **Los criterios calculados solos son la medida independiente.** El juez de la segunda tabla es
+  el mismo Claude que guió las correcciones, así que esa mejora hay que leerla con cuidado.
+- **Sin candados, el juez coincidía con los criterios.** Claude no sabía cuáles preguntas estaban
+  fuera del artículo y aun así reprobó justo las 2 abstenciones fallidas.
+- **Antes, el juez era el mismo LLM local de 4b.** Solo revisaba 20 respuestas y se juzgaba a sí
+  mismo. Con salida JSON forzada calificaba todo como «no» y 1.
 
 ---
 
 ## Auditor con Claude
 
-Después de cada respuesta, la API le pide a Claude, por la
+Antes de mostrar cada respuesta, el agente le pide a Claude, por la
 [API de Anthropic](https://docs.claude.com), que la revise ([`api/auditor.py`](api/auditor.py)).
 Claude recibe la pregunta, los **5 fragmentos que recuperó la búsqueda** (marcados como citados o
 no) y la respuesta. Con eso devuelve un veredicto con salida estructurada, que el SDK valida contra
@@ -333,9 +343,9 @@ un modelo de Pydantic:
 | `abstencion_correcta` | Que acertara al contestar o al decir que el artículo no lo cubre |
 | `veredicto` | `aprobada`, `con_observaciones` o `reprobada`, con la lista de problemas y un resumen |
 
-- **No hace esperar al usuario.** La respuesta se muestra en cuanto está lista y la auditoría llega
-  2 a 4 s después por el mismo SSE. En el chat aparece como «Aprobada · Auditada por Claude» y se
-  despliega con el detalle. Se guarda en la tabla `auditorias` y alimenta el panel `/admin`.
+- **En el chat** aparece como «Aprobada · Verificada por Claude» (o «Con observaciones»,
+  «Reprobada»), y se despliega con el detalle. Si hubo que corregir, lo dice. Se guarda en la
+  tabla `auditorias` y alimenta el panel `/admin`.
 - **Corre en la nube.** No ocupa la RAM ni la GPU de la máquina, donde ya están vLLM y Ollama.
 - **Costo.** Usa `claude-haiku-5-5` (US$0.10 por millón de tokens de entrada y US$0.50 de salida).
   Cada auditoría cuesta unos US$0.0007, con ~4,000 tokens de entrada. Se cambia con
@@ -343,13 +353,36 @@ un modelo de Pydantic:
   en la tabla de abajo.
 - **No paga dos veces.** Una respuesta que sale de la caché de Redis reusa su auditoría. Además, un
   tope diario (`LIMITE_AUDITORIAS_DIA`) protege el saldo si la URL pública recibe muchas preguntas.
-- **Si falla, no estorba.** Sin llave, sin saldo o sin red, el chat funciona igual y solo dice «No
-  se pudo auditar esta respuesta».
+- **Si falla, no estorba.** Sin llave, sin saldo o sin red, el chat funciona igual: los candados en
+  código siguen activos y la respuesta sale marcada «Sin verificar con Claude».
+
+### Candados antes de responder
+
+Todos viven en el validador de salida de Pydantic AI (`revisar_respuesta` en
+[`api/agente.py`](api/agente.py)). Corre cada vez que el modelo intenta entregar su respuesta.
+Si un candado falla, Pydantic AI le devuelve el motivo al modelo (`ModelRetry`) y este lo
+intenta de nuevo; la respuesta no sale de la API hasta pasarlos.
+
+| # | Candado | Si falla |
+|---|---|---|
+| 1 | Tiene que haber llamado `buscar_en_articulo` | Reintenta: «primero busca» |
+| 2 | Solo puede citar ids que la búsqueda le devolvió | Reintenta con la lista de ids válidos |
+| 3 | Si dice que sí puede responder, cita al menos un fragmento | Reintenta; en el último intento se abstiene: **sin cita no hay respuesta** |
+| 4 | Si su respuesta solo dice «el artículo no menciona…» | Se toma como abstención (así fallaban las 2 de la evaluación) |
+| 5 | Responde en el idioma de la pregunta | Reintenta con la nota de idioma (tras una corrección, una respuesta en inglés salía en español) |
+| 6 | Claude verifica la respuesta contra los fragmentos | Si afirma algo sin respaldo, cita mal o debió abstenerse, Claude le regresa la lista de problemas y el agente la corrige (una vez); la versión corregida se vuelve a verificar |
+
+Los candados 1 a 5 son código y no cuestan nada. El 6 cuesta una llamada a Claude, o dos si hubo
+corrección. También agrega tiempo: ~3 s cuando la respuesta pasa a la primera y ~10 s más cuando
+hay que corregir. Si después de corregir quedan detalles, la respuesta se muestra con su veredicto
+(«Con observaciones») en vez de esconderla. Así queda a la vista lo que Claude encontró.
 
 ### Haiku contra Sonnet (`evaluacion/comparar_auditores.py`)
 
 Los dos modelos auditaron exactamente los mismos 33 casos, con los mismos fragmentos. 25 son las
-respuestas reales de la evaluación y 8 se echaron a perder a propósito: 4 llevan la respuesta de
+respuestas reales de la evaluación de antes de los candados
+([`resultados_agente_sin_candados.json`](evaluacion/resultados_agente_sin_candados.json)) y 8 se
+echaron a perder a propósito: 4 llevan la respuesta de
 otra pregunta y 4 un dato inventado al final («BM25 fue propuesto por Google en 2015…»). Los
 resultados completos están en
 [`evaluacion/comparacion_auditores.json`](evaluacion/comparacion_auditores.json).
@@ -442,5 +475,7 @@ pruebas/        peticiones de prueba para Ollama (tool calling) y vLLM (un embed
   transmite en vivo es el progreso: qué buscó y cuándo está redactando.
 - El auditor solo ve los 5 fragmentos recuperados, no el artículo completo: si la búsqueda no trajo
   el fragmento correcto, puede dar por buena una abstención que no lo era.
-- La auditoría depende de la API de Claude (red y saldo). Si falla, la respuesta se muestra igual
-  con el aviso «No se pudo auditar esta respuesta».
+- La verificación depende de la API de Claude (red y saldo). Si falla, los candados en código
+  siguen activos y la respuesta sale con el aviso «Sin verificar con Claude».
+- Verificar antes de mostrar duplica el tiempo promedio (de 5.3 a 11 s). Solo se corrige una vez:
+  si después de corregir quedan detalles, se muestran en el veredicto en vez de volver a intentar.
