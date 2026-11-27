@@ -211,6 +211,8 @@ async def resumen(grupo: AsyncConnectionPool, desde: datetime | None, hasta: dat
                count(*) FILTER (WHERE a.abstencion_correcta)             AS abstencion_correcta,
                avg(a.relevancia)::float                                  AS relevancia_prom,
                coalesce(sum(a.costo_usd), 0)::float                      AS costo_usd,
+               (avg(a.costo_usd) FILTER (WHERE NOT a.desde_cache))::float AS costo_prom_usd,
+               (max(a.costo_usd) FILTER (WHERE NOT a.desde_cache))::float AS costo_max_usd,
                avg(a.segundos) FILTER (WHERE NOT a.desde_cache)          AS segundos_prom
           FROM auditorias a JOIN mensajes m ON m.id = a.mensaje_id
          WHERE true {filtro}"""

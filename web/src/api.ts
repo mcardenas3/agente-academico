@@ -186,7 +186,9 @@ export type ResumenAuditoria = {
   citas_correctas: number
   abstencion_correcta: number
   relevancia_prom: number | null
-  costo_usd: number
+  costo_usd: number               // todo lo que se ha gastado en Claude en el periodo
+  costo_prom_usd: number | null   // por respuesta verificada (sin contar las de caché)
+  costo_max_usd: number | null    // la más cara (suele ser una corregida: dos revisiones)
   segundos_prom: number | null
 }
 

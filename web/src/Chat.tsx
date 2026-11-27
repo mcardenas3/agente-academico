@@ -380,7 +380,7 @@ function Auditado({ estado }: { estado: Auditoria | 'pendiente' | null }) {
           <p className="m-0 text-micro text-ink-faint">
             Revisión hecha con {estado.modelo} contra los fragmentos que recuperó la búsqueda
             {corregida ? `, después de que el agente corrigió lo que Claude le regresó` : ''}
-            {estado.desde_cache ? ' · reusada de la caché' : ''}
+            {estado.desde_cache ? ' · reusada de la caché, sin costo' : ` · costó US$${estado.costo_usd.toFixed(4)}`}
           </p>
         </div>
       )}

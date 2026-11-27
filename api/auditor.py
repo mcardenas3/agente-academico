@@ -80,7 +80,8 @@ class Veredicto(BaseModel):
 
 
 class Auditoria(Veredicto):
-    """El veredicto más lo que costó obtenerlo."""
+    """El veredicto más lo que costó obtenerlo (en una respuesta corregida, la suma de todas las
+    revisiones)."""
 
     modelo: str
     tokens_entrada: int

@@ -170,7 +170,7 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
           <Kpi titulo="Corregidas" valor={numero(r?.corregidas)}
             detalle="Claude las regresó antes de mostrarlas" />
           <Kpi titulo="Costo de Claude" valor={dolares(a?.costo_usd)}
-            detalle={`${numero(a?.auditadas)} auditadas · ${tiempo(a?.segundos_prom)} cada una`} />
+            detalle={`${dolares(a?.costo_prom_usd ?? undefined)} por respuesta · máx. ${dolares(a?.costo_max_usd ?? undefined)}`} />
         </div>
 
         <div className="card mt-3 p-4">
@@ -237,6 +237,9 @@ function FilaDetalle({ f }: { f: FilaPregunta }) {
           {f.desde_cache
             ? <span className="chip" data-tone="ok"><Lightning size={11} weight="fill" /> Caché</span>
             : <span className="tabular-nums">{numero(f.tokens_entrada)} → {numero(f.tokens_salida)} tokens</span>}
+          {f.auditoria && !f.desde_cache && (
+            <span className="tabular-nums">· Claude {dolares(f.auditoria.costo_usd)}</span>
+          )}
           {!f.se_puede_responder && <span className="chip" data-tone="warn">Fuera del artículo</span>}
           {f.error && <span className="chip" data-tone="bad">Error</span>}
           {f.correcciones > 0 && !f.desde_cache && <span className="chip" data-tone="warn">Corregida</span>}
@@ -249,7 +252,10 @@ function FilaDetalle({ f }: { f: FilaPregunta }) {
         </div>
         {abierta && f.auditoria && (
           <div className="mt-3 rounded-[10px] bg-raised px-3 py-2.5 text-micro">
-            <div className="text-ink-faint">Auditoría ({f.auditoria.modelo})</div>
+            <div className="text-ink-faint">
+              Verificación con {f.auditoria.modelo} · {dolares(f.auditoria.costo_usd)}
+              {f.correcciones > 0 ? ` (${f.correcciones + 1} revisiones)` : ''}
+            </div>
             <p className="m-0 mt-0.5 text-meta text-ink">{f.auditoria.analisis}</p>
             {f.auditoria.problemas.length > 0 && (
               <ul className="m-0 mt-1.5 list-disc pl-5 text-ink-muted">

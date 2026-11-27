@@ -446,8 +446,9 @@ Protegido con `Authorization: Bearer <ADMIN_TOKEN>`. Lee todo de PostgreSQL:
 - porcentaje de respuestas desde caché, con su latencia comparada;
 - preguntas fuera del artículo y errores;
 - una gráfica por día;
-- la auditoría con Claude: porcentaje de respuestas aprobadas, fieles y con citas correctas,
-  relevancia promedio y cuánto se ha gastado en la API;
+- la verificación con Claude: porcentaje de respuestas aprobadas, fieles y con citas correctas,
+  relevancia promedio, respuestas corregidas, y cuánto se ha gastado en la API (total, promedio
+  por respuesta y la más cara). Una respuesta corregida suma el costo de sus dos revisiones;
 - la lista de preguntas y respuestas, con buscador, filtro de fechas y el detalle de cada una
   (modelo, llamadas al LLM, tools, consulta a BM25, veredicto y análisis del auditor).
 

@@ -122,6 +122,8 @@ class Dependencias:
     # Verificación con Claude antes de entregar la respuesta
     verificar: bool = False
     auditoria: Auditoria | None = None     # la de la respuesta que se entregó
+    # Todas las verificaciones de esta pregunta (las que regresaron la respuesta también cuestan)
+    verificaciones: list[Auditoria] = field(default_factory=list)
     correcciones: int = 0                  # veces que Claude la regresó para corregirla
     error_verificacion: str | None = None  # si Claude no respondió (sin red, sin saldo…)
 
@@ -348,6 +350,7 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
         # Claude no respondió: se entrega sin verificar (la interfaz lo dice) en vez de no responder
         d.error_verificacion = str(error)
         return salida
+    d.verificaciones.append(a)
     # Solo se corrige lo que afirma algo; una abstención no tiene afirmaciones que corregir
     if (salida.se_puede_responder and tiene_problemas(a)
             and d.correcciones < MAX_CORRECCIONES and not ctx.last_attempt):
@@ -359,7 +362,13 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
             "the fragments, and list in fragmentos_citados the fragments that support it. If the "
             "fragments do not contain the answer, set se_puede_responder to false. Keep the "
             f"language of the user's question. {NOTA_DE_IDIOMA[idioma]}")
-    d.auditoria = a
+    # El veredicto es el de la última revisión; el costo y el tiempo, la suma de todas
+    v = d.verificaciones
+    d.auditoria = a.model_copy(update={
+        "tokens_entrada": sum(x.tokens_entrada for x in v),
+        "tokens_salida": sum(x.tokens_salida for x in v),
+        "costo_usd": round(sum(x.costo_usd for x in v), 6),
+        "segundos": round(sum(x.segundos for x in v), 2)})
     return salida
 
 
