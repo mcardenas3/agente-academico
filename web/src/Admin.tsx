@@ -162,7 +162,7 @@ function Panel({ token, oscuro, onSalir, onCostos }: {
           <Kpi titulo="Fieles al artículo" valor={pct(a?.fieles, a?.auditadas)}
             detalle={`responde lo pedido ${pct(a?.responde_lo_pedido, a?.auditadas)} · citas correctas ${pct(a?.citas_correctas, a?.auditadas)} · relevancia ${a?.relevancia_prom != null ? a.relevancia_prom.toFixed(1) : '—'}/5`} />
           <Kpi titulo="Corregidas" valor={numero(r?.corregidas)}
-            detalle="Claude las regresó antes de mostrarlas" />
+            detalle={`${numero(r?.descartadas)} descartadas: no fieles aun corregidas`} />
           <Kpi titulo="Costo de Claude" valor={dolares(a?.costo_usd)}
             detalle={`${dolares(a?.costo_prom_usd ?? undefined)} por respuesta · máx. ${dolares(a?.costo_max_usd ?? undefined)}`} />
         </div>
@@ -228,6 +228,7 @@ function FilaDetalle({ f }: { f: FilaPregunta }) {
           {!f.se_puede_responder && <span className="chip" data-tone="warn">Fuera del artículo</span>}
           {f.error && <span className="chip" data-tone="bad">Error</span>}
           {f.correcciones > 0 && !f.desde_cache && <span className="chip" data-tone="warn">Corregida</span>}
+          {f.respuesta_descartada && <span className="chip" data-tone="bad">Descartada</span>}
           {f.auditoria && (
             <span className="chip" data-tone={VEREDICTOS[f.auditoria.veredicto].tono}>
               {f.auditoria.veredicto === 'aprobada' ? <ShieldCheck size={11} weight="bold" /> : <ShieldWarning size={11} weight="bold" />}
@@ -235,6 +236,12 @@ function FilaDetalle({ f }: { f: FilaPregunta }) {
             </span>
           )}
         </div>
+        {abierta && f.respuesta_descartada && (
+          <div className="mt-3 rounded-[10px] border border-[var(--red-6)] px-3 py-2.5 text-micro">
+            <div className="text-[var(--red-11)]">Respuesta descartada (no se le mostró al usuario)</div>
+            <p className="m-0 mt-0.5 whitespace-pre-wrap text-meta text-ink-muted">{f.respuesta_descartada}</p>
+          </div>
+        )}
         {abierta && f.auditoria && (
           <div className="mt-3 rounded-[10px] bg-raised px-3 py-2.5 text-micro">
             <div className="text-ink-faint">

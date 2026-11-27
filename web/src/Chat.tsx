@@ -305,7 +305,9 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
       {m.citas.length > 0 && <TextoCitado citas={m.citas} />}
       {m.meta && (
         <div className="flex flex-wrap items-center gap-2 text-micro text-ink-faint">
-          {fuera && <span className="chip" data-tone="warn">Fuera del artículo</span>}
+          {m.meta?.descartada
+            ? <span className="chip" data-tone="bad">Sin respuesta confiable</span>
+            : fuera && <span className="chip" data-tone="warn">Fuera del artículo</span>}
           {m.meta.desde_cache ? (
             <span className="inline-flex items-center gap-1"><Lightning size={12} weight="fill" /> Desde caché · {tiempo(m.meta.segundos)}</span>
           ) : (

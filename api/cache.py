@@ -51,8 +51,9 @@ async def leer_respuesta(redis: Redis, pregunta: str) -> RespuestaCitada | None:
 
 
 async def guardar_respuesta(redis: Redis, pregunta: str, respuesta: RespuestaCitada) -> None:
-    # Solo respuestas sanas: un error no se cachea, para que la siguiente vez se intente otra vez
-    if respuesta.error is None:
+    # Solo respuestas sanas: un error o una respuesta descartada no se cachean, para que la
+    # siguiente vez se intente otra vez
+    if respuesta.error is None and respuesta.descartada is None:
         await redis.set(llave_respuesta(pregunta), respuesta.model_dump_json(),
                         ex=DURACION_RESPUESTA)
 

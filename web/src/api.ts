@@ -19,6 +19,7 @@ export type Respuesta = {
   verificacion: 'verificada' | 'fallida' | 'omitida' | 'inactiva'
   auditoria: Auditoria | null
   correcciones: number  // veces que Claude la regresó para corregirla
+  descartada: string | null  // la que Claude reprobó aun corregida (se muestra un mensaje fijo)
   auditando: boolean    // true = respuesta vieja de caché: su auditoría llega después
 }
 
@@ -175,6 +176,7 @@ export type Resumen = {
   sin_respuesta: number
   errores: number
   corregidas: number
+  descartadas: number
   auditoria: ResumenAuditoria
 }
 
@@ -213,6 +215,7 @@ export type FilaPregunta = {
   error: string | null
   modelo: string
   correcciones: number
+  respuesta_descartada: string | null
   auditoria: Auditoria | null
 }
 
@@ -257,6 +260,7 @@ export type CostoPregunta = {
   correcciones: number
   se_puede_responder: boolean
   error: string | null
+  descartada: boolean
   modelo_auditor: string | null
   veredicto: Auditoria['veredicto'] | null
   claude_tokens_entrada: number | null

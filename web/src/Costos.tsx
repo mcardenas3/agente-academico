@@ -200,7 +200,9 @@ function FilaPregunta({ p, n }: { p: CostoPregunta; n: number }) {
         )}
         {v && <span className="chip" data-tone={v.tono}>{v.texto}</span>}
         {p.correcciones > 0 && !p.desde_cache && <span className="chip" data-tone="warn">Corregida</span>}
-        {!p.se_puede_responder && <span className="chip">Fuera del artículo</span>}
+        {p.descartada
+          ? <span className="chip" data-tone="bad">Descartada</span>
+          : !p.se_puede_responder && <span className="chip">Fuera del artículo</span>}
         {p.error && <span className="chip" data-tone="bad">Error</span>}
       </div>
     </li>

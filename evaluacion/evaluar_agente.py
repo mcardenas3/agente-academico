@@ -144,6 +144,7 @@ def main() -> None:
             "error": r.error,
             "verificacion": r.verificacion,
             "correcciones": r.correcciones,
+            "descartada": r.descartada,
         }
         fila = auditar_fila(cliente, fila, r.auditoria)
         resultados.append(fila)
@@ -188,6 +189,8 @@ def resumir(resultados: list[dict], salida: Path) -> None:
         "claude: costo total (US$)": round(sum(f["auditoria_costo_usd"] for f in auditadas), 4),
         "corregidas antes de mostrarse": f"{sum(f.get('correcciones', 0) > 0 for f in resultados)}"
                                          f"/{len(resultados)}",
+        "descartadas (no fieles aun corregidas)": f"{sum(bool(f.get('descartada')) for f in resultados)}"
+                                                  f"/{len(resultados)}",
         "segundos promedio": round(sum(f["segundos"] for f in resultados) / len(resultados), 2),
         "tokens de entrada promedio": round(sum(f["tokens_entrada"] for f in resultados)
                                             / len(resultados)),

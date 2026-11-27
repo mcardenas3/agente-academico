@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS metricas (
 COMMENT ON TABLE metricas IS 'Lo que costó cada respuesta del agente: tokens, tiempos y caché';
 ALTER TABLE metricas ADD COLUMN IF NOT EXISTS correcciones INTEGER NOT NULL DEFAULT 0;
 COMMENT ON COLUMN metricas.correcciones IS 'Veces que Claude regresó la respuesta para corregirla antes de mostrarla';
+ALTER TABLE metricas ADD COLUMN IF NOT EXISTS respuesta_descartada TEXT;
+COMMENT ON COLUMN metricas.respuesta_descartada IS 'Respuesta que Claude reprobó aun después de corregir; al usuario se le mostró un mensaje fijo';
 
 CREATE TABLE IF NOT EXISTS citas (
     id           BIGSERIAL PRIMARY KEY,

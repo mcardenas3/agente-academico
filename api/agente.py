@@ -11,19 +11,25 @@
   Claude verifica que todo lo que afirma salga de los fragmentos; si no, el agente la corrige.
 """
 
+import json
 import os
 import re
 import time
+import uuid
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # Pydantic AI imprime un anuncio de su servicio de monitoreo al correr un agente; esto lo apaga
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
 from opensearchpy import OpenSearch  # noqa: E402  (los imports van después de la línea de arriba)
 from pydantic import BaseModel, Field  # noqa: E402
-from pydantic_ai import Agent, ModelRetry, ModelSettings, RunContext, ToolOutput  # noqa: E402
-from pydantic_ai.exceptions import UnexpectedModelBehavior  # noqa: E402
+from pydantic_ai import (  # noqa: E402
+    Agent, ModelRetry, ModelSettings, RunContext, ToolOutput, capture_run_messages,
+)
+# AgentRunError incluye los reintentos agotados (UnexpectedModelBehavior) y los errores de tiempo
+# y de conexión con Ollama (ModelAPIError): en todos se rescata lo que se tenga
+from pydantic_ai.exceptions import AgentRunError  # noqa: E402
 from pydantic_ai.messages import (  # noqa: E402
     ModelMessage, ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart, UserPromptPart,
 )
@@ -77,6 +83,14 @@ text.
 NO_CUBRE = {
     "es": "El artículo no trata este tema, así que no puedo responderlo con base en él.",
     "en": "The article does not cover this topic, so I can't answer it based on the article.",
+}
+# Lo que se responde cuando, aun después de corregir, Claude sigue diciendo que la respuesta no
+# sale del artículo: mejor no mostrar nada que mostrar algo inventado (decisión del usuario)
+NO_LOGRADA = {
+    "es": "No logré una respuesta que se sostenga en el artículo, aun después de corregirla. "
+          "Intenta reformular la pregunta o hacerla más específica.",
+    "en": "I couldn't produce an answer supported by the article, even after correcting it. "
+          "Try rephrasing the question or making it more specific.",
 }
 
 # Palabras frecuentes de cada idioma para adivinar en cuál viene la pregunta
@@ -137,6 +151,11 @@ class Dependencias:
     # La respuesta que Claude regresó, con su veredicto: si la corrección sale peor (se abstiene
     # cuando Claude dijo que sí había con qué responder), se entrega esta
     previa: "tuple[Respuesta, Auditoria] | None" = None
+    # True si, sin correcciones disponibles, Claude sigue diciendo que no es fiel: no se muestra
+    descartada: bool = False
+    # La última respuesta que Claude revisó, con su veredicto: si se agotan los reintentos, se
+    # entrega esta en vez de perderlo todo
+    ultima: "tuple[Respuesta, Auditoria] | None" = None
     error_verificacion: str | None = None  # si Claude no respondió (sin red, sin saldo…)
 
 
@@ -196,9 +215,57 @@ class RespuestaCitada(BaseModel):
     verificacion: str = "omitida"
     auditoria: Auditoria | None = None
     correcciones: int = 0
+    # La respuesta que Claude reprobó aun después de corregir: no se muestra (en su lugar va
+    # NO_LOGRADA), pero se guarda para revisarla en /admin
+    descartada: str | None = None
 
 
-modelo = OllamaModel(MODELO_LLM, provider=OllamaProvider(base_url=URL_OLLAMA))
+# Llamadas a tools que el modelo escribe como texto, en su formato nativo, y Ollama no reconoce:
+# "<tool_call>\n<function=responder>  \n<parameter=respuesta>  \n…</parameter>…</function>"
+# (los espacios después de las etiquetas y la falta de </tool_call> lo confunden). Medido: tras un
+# mensaje de corrección pasaba seguido; el modelo repetía el mismo texto hasta agotar los 6
+# reintentos y se perdía una respuesta que estaba bien
+_LLAMADA_EN_TEXTO = re.compile(
+    r"<tool_call>\s*<function=([\w-]+)>(.*?)(?:</function>|</tool_call>|$)", re.S)
+_PARAMETRO = re.compile(r"<parameter=([\w-]+)>(.*?)(?=</parameter>|<parameter=|</function>|$)",
+                        re.S)
+
+
+def _valor(texto: str):
+    """El valor de un parámetro: listas, números y booleanos vienen como JSON (o True/False)."""
+    texto = texto.strip()
+    try:
+        return json.loads(texto)
+    except ValueError:
+        return {"True": True, "False": False}.get(texto, texto)
+
+
+def rescatar_llamadas(respuesta: ModelResponse) -> ModelResponse:
+    """Convierte las llamadas escritas como texto en llamadas a tool de verdad."""
+    partes, rescato = [], False
+    for parte in respuesta.parts:
+        llamadas = (_LLAMADA_EN_TEXTO.findall(parte.content)
+                    if parte.part_kind == "text" and "<tool_call>" in parte.content else [])
+        if not llamadas:
+            partes.append(parte)
+            continue
+        for nombre, cuerpo in llamadas:
+            partes.append(ToolCallPart(
+                tool_name=nombre, args={k: _valor(v) for k, v in _PARAMETRO.findall(cuerpo)},
+                tool_call_id=f"rescate-{uuid.uuid4().hex[:8]}"))
+        rescato = True
+    return replace(respuesta, parts=partes, finish_reason="tool_call") if rescato else respuesta
+
+
+class OllamaConRescate(OllamaModel):
+    """OllamaModel que rescata las llamadas a tool que llegan como texto."""
+
+    async def request(self, messages, model_settings, model_request_parameters):
+        return rescatar_llamadas(
+            await super().request(messages, model_settings, model_request_parameters))
+
+
+modelo = OllamaConRescate(MODELO_LLM, provider=OllamaProvider(base_url=URL_OLLAMA))
 
 agente = Agent(
     modelo,
@@ -221,11 +288,14 @@ agente = Agent(
         # Máximo por llamada al LLM. Sin esto el cliente espera hasta 10 min: medido, una
         # pregunta de la evaluación se quedó colgada 629 s
         timeout=90,
+        # Máximo de tokens por respuesta del LLM. Medido: a veces entra en un bucle y genera sin
+        # parar (4,292 tokens en 90 s, en el log de Ollama); una respuesta normal ocupa < 700
+        max_tokens=1024,
     ),
     # Si el LLM se equivoca (argumentos mal formados, no buscó, citó un id ajeno, no citó nada o
-    # Claude encontró algo sin respaldo), se le devuelve el error y puede intentar otra vez, hasta
-    # 3 veces
-    retries=3,
+    # Claude encontró algo sin respaldo), se le devuelve el error y puede intentar otra vez. Da
+    # para las 3 correcciones de Claude más un par de tropiezos de los candados en código
+    retries=6,
 )
 
 
@@ -301,8 +371,25 @@ _NIEGA_EL_TEMA = re.compile(
     r"|express|contain|specify|present)", re.IGNORECASE)
 # Solo cuenta si la respuesta es corta: "El artículo no menciona X, pero explica Y…" sí responde
 LARGO_MAXIMO_NEGACION = 250
-# Cuántas veces puede Claude regresar una respuesta para que se corrija
-MAX_CORRECCIONES = 1
+# Cuántas veces puede Claude regresar una respuesta para que se corrija. Si inventa, cita mal o
+# debió abstenerse, hasta MAX_CORRECCIONES (decisión del usuario: tiempo antes que errores); si
+# solo tiene detalles sin respaldo o le falta detalle a un seguimiento, una vez (medido: más
+# vueltas ahí no mejoraban)
+MAX_CORRECCIONES = int(os.environ.get("MAX_CORRECCIONES", "3"))
+MAX_CORRECCIONES_DETALLE = 1
+
+
+def es_grave(a: Auditoria) -> bool:
+    """Problemas que engañan al usuario: la idea central no sale del artículo, las citas no la
+    sostienen o no debió contestar. Medido: con "parcialmente fiel" también en las 3 vueltas, el
+    modelo gastaba las correcciones en detalles, alternaba entre contestar y abstenerse y se
+    agotaban los reintentos (se perdía una respuesta que sí estaba en el artículo)."""
+    return a.fidelidad == "no_fiel" or not a.citas_correctas or not a.abstencion_correcta
+
+
+def es_fallida(a: Auditoria) -> bool:
+    """Respuesta que no se debe mostrar: no sale del artículo o no debió contestarse."""
+    return a.fidelidad == "no_fiel" or a.veredicto == "reprobada"
 
 
 def niega_el_tema(texto: str) -> bool:
@@ -346,9 +433,11 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
        es abstención; si marca que no se puede pero escribió una respuesta citada, es respuesta.
     5. Tiene que responder en el idioma de la pregunta.
     6. No puede quedar cortada a media frase.
-    7. Claude revisa la respuesta contra los fragmentos. Si afirma algo sin respaldo, cita mal,
-       debió abstenerse o no hace lo que se pidió, se le regresan los problemas para que la
-       corrija (una vez).
+    7. Claude revisa la respuesta contra los fragmentos. Si afirma algo sin respaldo, cita mal o
+       debió abstenerse, se le regresan los problemas para que la corrija (hasta
+       MAX_CORRECCIONES veces); si en un seguimiento solo le falta lo que se pidió, una vez.
+    8. Si ya no quedan correcciones y Claude sigue diciendo que no es fiel, no se muestra: va el
+       mensaje fijo NO_LOGRADA.
     """
     d = ctx.deps
     vistos = d.fragmentos_vistos
@@ -358,7 +447,7 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
     if ajenos:
         raise ModelRetry(f"These ids were not returned by the search: {ajenos}. "
                          f"Cite only ids from this list: {list(vistos)}.")
-    texto = _IDS_EN_TEXTO.sub("", salida.respuesta).strip()
+    texto = limpiar_texto(salida.respuesta)
     if salida.se_puede_responder and niega_el_tema(texto):
         salida = _abstencion()
     elif contesta_aunque_dice_que_no(salida, texto):
@@ -386,8 +475,10 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
     if d.previa and not salida.se_puede_responder:
         # Medido: tras una corrección, el modelo a veces se abstiene aunque Claude había dicho que
         # sí había con qué responder (perdió la respuesta de "recuperación adaptativa"). Se
-        # entrega la respuesta anterior con su veredicto, sin volver a pagarle a Claude
+        # entrega la respuesta anterior con su veredicto, sin volver a pagarle a Claude; si esa
+        # tampoco era fiel, no se muestra
         salida, d.auditoria = d.previa
+        d.descartada = es_fallida(d.auditoria)
         return salida
     anterior = d.turno_anterior
     caso = Caso(pregunta=d.pregunta, consulta=d.consulta,
@@ -410,9 +501,12 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
         "tokens_salida": sum(x.tokens_salida for x in v),
         "costo_usd": round(sum(x.costo_usd for x in v), 6),
         "segundos": round(sum(x.segundos for x in v), 2)})
+    if salida.se_puede_responder:
+        d.ultima = (salida, auditoria)
     # Solo se corrige lo que afirma algo; una abstención no tiene afirmaciones que corregir
+    limite = MAX_CORRECCIONES if es_grave(a) else MAX_CORRECCIONES_DETALLE
     if (salida.se_puede_responder and tiene_problemas(a, seguimiento=anterior is not None)
-            and d.correcciones < MAX_CORRECCIONES and not ctx.last_attempt):
+            and d.correcciones < limite and not ctx.last_attempt):
         d.correcciones += 1
         # Si Claude dijo que contestar era lo correcto, la corrección no puede terminar en
         # abstención: se guarda esta respuesta por si acaso
@@ -438,6 +532,8 @@ async def revisar_respuesta(ctx: RunContext[Dependencias], salida: Respuesta) ->
             "appears in the fragments, and list in fragmentos_citados the fragments that support "
             f"it. {abstenerse}Keep the language of the user's question. {NOTA_DE_IDIOMA[idioma]}")
     d.auditoria = auditoria
+    # Ya no quedan correcciones y Claude sigue diciendo que no sale del artículo: no se muestra
+    d.descartada = salida.se_puede_responder and es_fallida(a)
     return salida
 
 
@@ -473,6 +569,15 @@ def historial_para_el_agente(turnos: list[Turno]) -> list[ModelMessage]:
 
 # Ids de fragmentos que el modelo a veces copia dentro del texto: "[huang2026-rag-survey-013, …]"
 _IDS_EN_TEXTO = re.compile(r"\s*\[?huang2026-rag-survey-\d+(?:,\s*huang2026-rag-survey-\d+)*\]?")
+# Términos que el modelo traduce mal. Medido: "pre-retrieval" y "post-retrieval" salían como
+# "pre-requisitos" y "post-requisitos" (en la búsqueda y en la respuesta)
+_TERMINOS_MAL_TRADUCIDOS = re.compile(r"\b(pre|post)[-\s]?requisitos?\b", re.IGNORECASE)
+
+
+def limpiar_texto(texto: str) -> str:
+    """Quita los ids copiados en el texto y corrige los términos mal traducidos."""
+    texto = _IDS_EN_TEXTO.sub("", texto).strip()
+    return _TERMINOS_MAL_TRADUCIDOS.sub(lambda m: f"{m.group(1)}-retrieval", texto)
 
 
 def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[ModelMessage],
@@ -485,12 +590,17 @@ def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[Mod
     # Lo que el agente buscó: los argumentos de su primera búsqueda
     busqueda = next((p.args_as_dict() for p in llamadas if p.tool_name == "buscar_en_articulo"), {})
 
+    descartada = None
     if salida is None or not salida.se_puede_responder:
         # Sin respuesta válida o fuera del artículo: mensaje fijo y sin citas
         texto, se_puede, citas = NO_CUBRE[idioma_de(pregunta)], False, []
+    elif dependencias.descartada:
+        # Claude la reprobó aun después de corregir: se guarda (para /admin) pero no se muestra
+        descartada = limpiar_texto(salida.respuesta)
+        texto, se_puede, citas = NO_LOGRADA[idioma_de(pregunta)], False, []
     else:
         # Las citas se muestran aparte; los ids dentro del texto sobran
-        texto, se_puede = _IDS_EN_TEXTO.sub("", salida.respuesta).strip(), True
+        texto, se_puede = limpiar_texto(salida.respuesta), True
         citas = [Cita(id=i, seccion=vistos[i].seccion, paginas=vistos[i].paginas)
                  for i in dict.fromkeys(salida.fragmentos_citados) if i in vistos]
     return RespuestaCitada(
@@ -504,6 +614,7 @@ def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[Mod
         segundos_busqueda=round(dependencias.segundos_busqueda, 2),
         error=error,
         recuperados=list(vistos),
+        descartada=descartada,
         verificacion=("verificada" if dependencias.auditoria else
                       "fallida" if dependencias.verificar else "omitida"),
         auditoria=dependencias.auditoria,
@@ -517,16 +628,30 @@ def preguntar(cliente: OpenSearch, pregunta: str, turnos: list[Turno] | None = N
     Con verificar=True, Claude la revisa antes de entregarla."""
     dependencias = Dependencias(cliente=cliente, pregunta=pregunta, verificar=verificar,
                                 turno_anterior=turnos[-1] if turnos else None)
+    historial = historial_para_el_agente(turnos or [])
     inicio = time.perf_counter()
-    try:
-        resultado = agente.run_sync(con_nota_de_idioma(pregunta, bool(turnos)), deps=dependencias,
-                                    message_history=historial_para_el_agente(turnos or []))
-    except UnexpectedModelBehavior as error:
-        # Se agotaron los reintentos: se responde con el mensaje fijo y se guarda el motivo
-        return _armar_respuesta(pregunta, None, [], None, dependencias,
-                                time.perf_counter() - inicio, error=str(error))
+    with capture_run_messages() as capturados:
+        try:
+            resultado = agente.run_sync(con_nota_de_idioma(pregunta, bool(turnos)),
+                                        deps=dependencias, message_history=historial)
+        except AgentRunError as e:
+            salida, error = _rescatar(dependencias, e)
+            return _armar_respuesta(pregunta, salida, capturados[len(historial):], None,
+                                    dependencias, time.perf_counter() - inicio, error=error)
     return _armar_respuesta(pregunta, resultado.output, resultado.new_messages(),
                             resultado.usage, dependencias, time.perf_counter() - inicio)
+
+
+def _rescatar(d: Dependencias, error: Exception) -> tuple[Respuesta | None, str]:
+    """Se agotaron los reintentos. Si Claude ya revisó alguna respuesta, se entrega la última
+    con su veredicto (y si no era fiel, se descarta); si no, el mensaje fijo. Medido: una
+    respuesta que sí estaba en el artículo se perdía en "no trata este tema" al agotarse los 6
+    reintentos entre correcciones y tropiezos del modelo."""
+    if d.ultima:
+        salida, d.auditoria = d.ultima
+        d.descartada = es_fallida(d.auditoria)
+        return salida, f"{error} (se entregó la última respuesta revisada por Claude)"
+    return None, str(error)
 
 
 # --- Versión con eventos, para que la API los mande al navegador mientras ocurren ---
@@ -549,9 +674,11 @@ async def preguntar_por_eventos(cliente: OpenSearch, pregunta: str,
     inicio = time.perf_counter()
     salida, mensajes, uso, error = None, [], None, None
     intentos = 0  # respuestas que el modelo ha propuesto (la 2.ª es una corrección)
+    corrida = None
     try:
         async with agente.iter(con_nota_de_idioma(pregunta, bool(turnos)), deps=dependencias,
-                               message_history=historial_para_el_agente(turnos or [])) as corrida:
+                               message_history=historial_para_el_agente(turnos or [])
+                               ) as corrida:
             async for nodo in corrida:
                 # Cada vuelta con tools: se avisa qué pidió el modelo. El nodo llega antes de
                 # ejecutarse, así que "verificando" sale justo antes de que Claude revise
@@ -570,8 +697,10 @@ async def preguntar_por_eventos(cliente: OpenSearch, pregunta: str,
             salida = corrida.result.output
             mensajes = corrida.result.new_messages()
             uso = corrida.result.usage
-    except UnexpectedModelBehavior as e:
-        error = str(e)
+    except AgentRunError as e:
+        salida, error = _rescatar(dependencias, e)
+        # Lo que alcanzó a hacer (búsquedas, intentos), para las métricas
+        mensajes = corrida.new_messages() if corrida else []
     respuesta = _armar_respuesta(pregunta, salida, mensajes, uso, dependencias,
                                  time.perf_counter() - inicio, error=error)
     yield Evento("final", respuesta.model_dump())

@@ -89,12 +89,13 @@ async def guardar_turno(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID, 
         await conexion.execute(
             "INSERT INTO metricas (mensaje_id, modelo, tokens_entrada, tokens_salida, llamadas_llm,"
             " segundos_total, segundos_busqueda, se_puede_responder, desde_cache, consulta_en,"
-            " tools, error, correcciones)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            " tools, error, correcciones, respuesta_descartada)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (mensaje_id, MODELO_LLM, respuesta.tokens_entrada, respuesta.tokens_salida,
              respuesta.llamadas_llm, respuesta.segundos, respuesta.segundos_busqueda,
              respuesta.se_puede_responder, desde_cache, respuesta.consulta_en,
-             respuesta.tools_llamadas, respuesta.error, respuesta.correcciones))
+             respuesta.tools_llamadas, respuesta.error, respuesta.correcciones,
+             respuesta.descartada))
         for cita in respuesta.citas:
             await conexion.execute(
                 "INSERT INTO citas (mensaje_id, fragmento_id, seccion, paginas) "
@@ -198,7 +199,9 @@ async def resumen(grupo: AsyncConnectionPool, desde: datetime | None, hasta: dat
                count(*) FILTER (WHERE x.desde_cache)                  AS desde_cache,
                count(*) FILTER (WHERE NOT x.se_puede_responder)       AS sin_respuesta,
                count(*) FILTER (WHERE x.error IS NOT NULL)            AS errores,
-               count(*) FILTER (WHERE x.correcciones > 0 AND NOT x.desde_cache) AS corregidas
+               count(*) FILTER (WHERE x.correcciones > 0 AND NOT x.desde_cache) AS corregidas,
+               count(*) FILTER (WHERE x.respuesta_descartada IS NOT NULL
+                                AND NOT x.desde_cache)                AS descartadas
           FROM mensajes m JOIN metricas x ON x.mensaje_id = m.id
          WHERE m.rol = 'agente' {filtro}"""
     # Lo que dijo el auditor (Claude) en el mismo periodo
@@ -311,6 +314,7 @@ async def costos_de_conversacion(grupo: AsyncConnectionPool, conversacion_id: uu
             "SELECT m.id, m.creado_en, p.contenido AS pregunta, x.modelo, x.tokens_entrada,"
             " x.tokens_salida, x.llamadas_llm, x.segundos_total::float, x.segundos_busqueda::float,"
             " x.desde_cache, x.correcciones, x.se_puede_responder, x.error,"
+            " x.respuesta_descartada IS NOT NULL AS descartada,"
             " a.modelo AS modelo_auditor, a.veredicto, a.tokens_entrada AS claude_tokens_entrada,"
             " a.tokens_salida AS claude_tokens_salida, a.costo_usd::float AS costo_claude,"
             " a.segundos::float AS segundos_claude"
@@ -334,7 +338,8 @@ async def lista_de_preguntas(grupo: AsyncConnectionPool, desde: datetime | None,
         SELECT m.id, m.creado_en, m.conversacion_id, p.contenido AS pregunta,
                m.contenido AS respuesta, x.tokens_entrada, x.tokens_salida, x.segundos_total,
                x.segundos_busqueda, x.se_puede_responder, x.desde_cache, x.llamadas_llm,
-               x.tools, x.consulta_en, x.error, x.modelo, x.correcciones, {_AUDITORIA_JSON}
+               x.tools, x.consulta_en, x.error, x.modelo, x.correcciones,
+               x.respuesta_descartada, {_AUDITORIA_JSON}
           FROM mensajes m
           JOIN metricas x ON x.mensaje_id = m.id
           JOIN LATERAL (SELECT contenido FROM mensajes

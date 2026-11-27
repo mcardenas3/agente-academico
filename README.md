@@ -294,25 +294,26 @@ cd api && uv run --env-file ../.env python ../evaluacion/evaluar_agente.py
 | Citó al menos un fragmento correcto (fijado de antemano) | 20/20 | **20/20** |
 | Respondió en el idioma de la pregunta | 25/25 | **25/25** |
 | Se abstuvo en las que el artículo no cubre | 3/5 | **5/5** |
-| Respuestas corregidas antes de mostrarse | — | 5/25 |
-| Tiempo promedio por pregunta | 5.3 s | 11.0 s |
+| Respuestas corregidas antes de mostrarse | — | 7/25 |
+| Respuestas descartadas (no fieles aun corregidas) | — | 0/25 |
+| Tiempo promedio por pregunta | 5.3 s | 12.4 s |
 
 El juez es el [auditor](#auditor-con-claude) (`claude-haiku-5-5`). Califica las 25 respuestas,
 abstenciones incluidas, con los 5 fragmentos recuperados a la vista:
 
 | Criterio (Claude como juez) | Sin candados | **Con candados** |
 |---|---|---|
-| Veredicto | 15 aprobadas · 8 con observaciones · 2 reprobadas | 15 aprobadas · 10 con observaciones · **0 reprobadas** |
-| Fiel a los fragmentos | 21/25 | **24/25** (1 parcialmente fiel, 0 no fiel) |
-| Citas que sostienen la respuesta | 24/25 | **24/25** |
+| Veredicto | 15 aprobadas · 8 con observaciones · 2 reprobadas | 16 aprobadas · 9 con observaciones · **0 reprobadas** |
+| Fiel a los fragmentos | 21/25 | 21/25 (4 parcialmente fiel, **0 no fiel**) |
+| Citas que sostienen la respuesta | 24/25 | **25/25** |
 | Acertó al responder o abstenerse | 23/25 | **25/25** |
-| Relevancia (1–5) | 4.64 | 4.32 |
-| Costo de Claude por corrida | US$0.018 | US$0.022 (incluye las verificaciones que regresaron respuestas) |
+| Relevancia (1–5) | 4.64 | 4.40 |
+| Costo de Claude por corrida | US$0.018 | US$0.025 (incluye las verificaciones que regresaron respuestas) |
 
 Con candados, el juez también revisa si la respuesta **hace todo lo que se pidió**. Para aprobar
 ya no basta con ser fiel y estar bien citada, así que «aprobadas» y «relevancia» son más estrictas
-que en la columna de la izquierda y no se comparan directo. Las 10 «con observaciones» son
-respuestas fieles a las que Claude les pide más detalle. En preguntas directas eso no dispara una
+que en la columna de la izquierda y no se comparan directo. Las 9 «con observaciones» son
+respuestas sin errores graves: les falta detalle o tienen alguna frase que generaliza. En preguntas directas eso no dispara una
 corrección: medido, hacerlo duplicaba las correcciones (de 5 a 11) y hacía que una respuesta
 correcta se perdiera en abstención.
 
@@ -379,10 +380,24 @@ intenta de nuevo; la respuesta no sale de la API hasta pasarlos.
 | 4 | La decisión cuadra con el texto | Si solo dice «el artículo no menciona…», es abstención (así fallaban las 2 de la evaluación). Si marca «no se puede» pero escribió una respuesta citada, es respuesta (así se perdía la desventaja de HyDE) |
 | 5 | Responde en el idioma de la pregunta | Reintenta con la nota de idioma (tras una corrección, una respuesta en inglés salía en español) |
 | 6 | No queda cortada a media frase | Reintenta (una corrección terminó en «En la fase post-ri») |
-| 7 | Claude verifica la respuesta contra los fragmentos | Si afirma algo sin respaldo, cita mal, debió abstenerse o, en un seguimiento, **no hace lo que se pidió** (p. ej. repite la lista cuando se pidió profundizar), Claude le regresa la lista de problemas y el agente la corrige (una vez); la versión corregida se vuelve a verificar. Si la corrección termina en abstención aunque Claude había dicho que sí había con qué responder, se entrega la respuesta anterior con su veredicto |
+| 7 | Claude verifica la respuesta contra los fragmentos | Si la idea central no sale del artículo, cita mal o debió abstenerse, Claude le regresa la lista de problemas y el agente la corrige, **hasta 3 veces** (`MAX_CORRECCIONES`); cada versión se vuelve a verificar. Si solo tiene detalles sin respaldo («parcialmente fiel») o, en un seguimiento, **no hace todo lo que se pidió**, se corrige una vez. Si una corrección termina en abstención aunque Claude había dicho que sí había con qué responder, se entrega la respuesta anterior |
+| 8 | Después de las correcciones, sigue sin ser fiel | **No se muestra.** Va el mensaje fijo «No logré una respuesta que se sostenga en el artículo…» con el chip «Sin respuesta confiable». La respuesta descartada se guarda para revisarla en `/admin` |
 
-Los candados 1 a 6 son código y no cuestan nada. El 7 cuesta una llamada a Claude, o dos si hubo
-corrección. En las preguntas de seguimiento, además, la pregunta lleva una nota para que el agente
+Los candados 1 a 6 son código y no cuestan nada. El 7 cuesta una llamada a Claude por versión
+revisada (US$0.0007 cada una).
+
+Además:
+- **Términos mal traducidos.** El código corrige los que el modelo traduce mal: «pre-requisitos»
+  y «post-requisitos» se convierten en pre-retrieval y post-retrieval.
+- **Llamadas escritas como texto.** A veces el modelo escribe la llamada a la tool en su formato
+  nativo (`<tool_call><function=responder>…`) con espacios de más, y Ollama no la reconoce.
+  `OllamaConRescate` la convierte en la llamada de verdad. Antes se repetía hasta agotar los
+  reintentos y se perdía una respuesta correcta.
+- **Bucles de generación.** Cada llamada al modelo local tiene un máximo de 1,024 tokens y de
+  90 s. Medido: a veces el modelo entraba en un bucle y generaba sin parar (4,292 tokens), lo que
+  colgó una pregunta 629 s.
+- **Si aun así se agotan los reintentos o falla la conexión con el modelo**, se entrega la última
+  respuesta que Claude revisó, con su veredicto, en vez de perderlo todo. En las preguntas de seguimiento, además, la pregunta lleva una nota para que el agente
 la reescriba completa antes de buscar. Antes, a «¿Y cuál es su desventaja?» la buscaba como «¿Qué
 es HyDE…?» y repetía la respuesta anterior. También agrega tiempo: ~3 s cuando la respuesta pasa a la primera y ~10 s más cuando
 hay que corregir. Si después de corregir quedan detalles, la respuesta se muestra con su veredicto
@@ -503,9 +518,9 @@ pruebas/        peticiones de prueba para Ollama (tool calling) y vLLM (un embed
   el fragmento correcto, puede dar por buena una abstención que no lo era.
 - La verificación depende de la API de Claude (red y saldo). Si falla, los candados en código
   siguen activos y la respuesta sale con el aviso «Sin verificar con Claude».
-- Verificar antes de mostrar duplica el tiempo promedio (de 5.3 a 11 s). Solo se corrige una vez:
-  si después de corregir quedan detalles, se muestran en el veredicto en vez de volver a intentar.
-  Con dos vueltas se probó, y no mejoró: tardó 30 s y llegó a agotar los reintentos.
+- Verificar antes de mostrar duplica el tiempo promedio (de 5.3 a 11 s). Una respuesta que
+  necesita las 3 correcciones puede tardar ~45 s. Se aceptó ese costo para no mostrar respuestas
+  inventadas.
 - Pedidos que abarcan varias secciones («explica a fondo cada fase») superan al modelo local de
   4b. Busca y corrige, pero la respuesta queda superficial; Claude la marca «Con observaciones» y
   dice qué le faltó.
