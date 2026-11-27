@@ -1,52 +1,43 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { admin, NoAutorizado, type Dia, type FilaPregunta, type Resumen } from './api'
-import { fecha, numero, tiempo } from './formato'
-import { Lightning, LockSimple, MagnifyingGlass, ShieldCheck, ShieldWarning, SignOut } from './iconos'
-
-const VEREDICTOS = {
-  aprobada: { texto: 'Aprobada', tono: 'ok' },
-  con_observaciones: { texto: 'Con observaciones', tono: 'warn' },
-  reprobada: { texto: 'Reprobada', tono: 'bad' },
-} as const
-
-/** Porcentaje entero de una parte sobre un total ("—" si no hay total). */
-function pct(parte: number | undefined, total: number | undefined): string {
-  return total ? `${Math.round((100 * (parte ?? 0)) / total)} %` : '—'
-}
-
-/** Dólares con los decimales que hagan falta: las auditorías cuestan fracciones de centavo. */
-function dolares(v: number | undefined): string {
-  if (v === undefined) return '—'
-  return `US$${v < 1 ? v.toFixed(4) : v.toFixed(2)}`
-}
+import Costos from './Costos'
+import { desdeDe, dolares, fecha, numero, pct, RANGOS, type Rango, tiempo } from './formato'
+import { Lightning, LockSimple, MagnifyingGlass, Receipt, ShieldCheck, ShieldWarning, SignOut } from './iconos'
+import { Kpi, VEREDICTOS } from './piezas'
 
 const LLAVE_TOKEN = 'admin_token'
 const POR_PAGINA = 25
-const RANGOS = [
-  { id: 'hoy', etiqueta: 'Hoy', dias: 0 },
-  { id: '7', etiqueta: '7 días', dias: 7 },
-  { id: '30', etiqueta: '30 días', dias: 30 },
-  { id: 'todo', etiqueta: 'Todo', dias: null },
-] as const
+const RUTA_COSTOS = '/admin/costos'
 
-function desdeDe(rango: (typeof RANGOS)[number]): string | undefined {
-  if (rango.dias === null) return undefined
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - rango.dias)
-  return d.toISOString()
+/** Qué vista del panel se ve, según la ruta: /admin o /admin/costos (con atrás/adelante). */
+function useVista() {
+  const leer = () => (window.location.pathname.startsWith(RUTA_COSTOS) ? 'costos' : 'panel')
+  const [vista, setVista] = useState<'panel' | 'costos'>(leer)
+  useEffect(() => {
+    const alCambiar = () => setVista(leer())
+    window.addEventListener('popstate', alCambiar)
+    return () => window.removeEventListener('popstate', alCambiar)
+  }, [])
+  const ir = useCallback((v: 'panel' | 'costos') => {
+    window.history.pushState(null, '', v === 'costos' ? RUTA_COSTOS : '/admin')
+    setVista(v)
+  }, [])
+  return [vista, ir] as const
 }
 
 export default function Admin({ oscuro }: { oscuro: boolean }) {
   const [token, setToken] = useState<string | null>(() => {
     try { return sessionStorage.getItem(LLAVE_TOKEN) } catch { return null }
   })
-  if (!token) return <Acceso onEntrar={setToken} />
-  return <Panel token={token} oscuro={oscuro} onSalir={() => {
+  const [vista, ir] = useVista()
+  const salir = useCallback(() => {
     try { sessionStorage.removeItem(LLAVE_TOKEN) } catch { /* nada */ }
     setToken(null)
-  }} />
+  }, [])
+  if (!token) return <Acceso onEntrar={setToken} />
+  if (vista === 'costos') return <Costos token={token} onSalir={salir} onVolver={() => ir('panel')} />
+  return <Panel token={token} oscuro={oscuro} onSalir={salir} onCostos={() => ir('costos')} />
 }
 
 function Acceso({ onEntrar }: { onEntrar: (t: string) => void }) {
@@ -87,8 +78,10 @@ function Acceso({ onEntrar }: { onEntrar: (t: string) => void }) {
   )
 }
 
-function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onSalir: () => void }) {
-  const [rango, setRango] = useState<(typeof RANGOS)[number]>(RANGOS[3])
+function Panel({ token, oscuro, onSalir, onCostos }: {
+  token: string; oscuro: boolean; onSalir: () => void; onCostos: () => void
+}) {
+  const [rango, setRango] = useState<Rango>(RANGOS[3])
   const [busqueda, setBusqueda] = useState('')
   const [texto, setTexto] = useState('')  // lo buscado, con un respiro para no consultar en cada tecla
   const [resumen, setResumen] = useState<Resumen | null>(null)
@@ -140,6 +133,7 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
               </button>
             ))}
           </div>
+          <button className="btn" onClick={onCostos}><Receipt size={16} weight="bold" /> Costos y desempeño</button>
           <button className="btn btn-ghost" onClick={onSalir}><SignOut size={16} weight="bold" /> Salir</button>
         </div>
 
@@ -208,15 +202,6 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
   )
 }
 
-function Kpi({ titulo, valor, detalle }: { titulo: string; valor: string; detalle: string }) {
-  return (
-    <div className="card px-4 py-3.5">
-      <div className="text-micro font-semibold tracking-wide text-ink-faint uppercase">{titulo}</div>
-      <div className="mt-1.5 text-kpi font-bold text-ink tabular-nums">{valor}</div>
-      <div className="mt-1 truncate text-micro text-ink-muted">{detalle}</div>
-    </div>
-  )
-}
 
 function FilaDetalle({ f }: { f: FilaPregunta }) {
   const [abierta, setAbierta] = useState(false)

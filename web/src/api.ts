@@ -214,6 +214,55 @@ export type FilaPregunta = {
   auditoria: Auditoria | null
 }
 
+// --- Vista de costos y desempeño (/admin/costos) ---
+
+/** Totales de un periodo o de una conversación. El modelo local no cobra: de él van tokens,
+ * llamadas y tiempo; lo que cuesta dinero es Claude (una llamada por verificación + una por
+ * cada corrección). */
+export type TotalesCosto = {
+  preguntas: number
+  desde_cache: number
+  tokens_entrada: number
+  tokens_salida: number
+  llamadas_llm: number
+  segundos_total: number
+  segundos_prom: number | null
+  verificaciones: number
+  correcciones: number
+  claude_tokens_entrada: number
+  claude_tokens_salida: number
+  costo_claude: number
+  aprobadas: number
+  con_observaciones: number
+  reprobadas: number
+}
+
+export type CostosResumen = TotalesCosto & { conversaciones: number }
+
+export type CostoConversacion = TotalesCosto & { id: string; titulo: string; inicio: string; ultima: string }
+
+export type CostoPregunta = {
+  id: number
+  creado_en: string
+  pregunta: string
+  modelo: string
+  tokens_entrada: number
+  tokens_salida: number
+  llamadas_llm: number
+  segundos_total: number
+  segundos_busqueda: number
+  desde_cache: boolean
+  correcciones: number
+  se_puede_responder: boolean
+  error: string | null
+  modelo_auditor: string | null
+  veredicto: Auditoria['veredicto'] | null
+  claude_tokens_entrada: number | null
+  claude_tokens_salida: number | null
+  costo_claude: number | null
+  segundos_claude: number | null
+}
+
 export class NoAutorizado extends Error {}
 
 export async function admin<T>(ruta: string, token: string, parametros: Record<string, string | number | undefined>): Promise<T> {

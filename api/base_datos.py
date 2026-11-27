@@ -237,6 +237,88 @@ async def por_dia(grupo: AsyncConnectionPool, desde: datetime | None, hasta: dat
         return await (await conexion.execute(consulta, valores)).fetchall()
 
 
+# --- Vista de costos y desempeño (/admin/costos) ---
+# El modelo local (Ollama) no cobra: de él se miden tokens, llamadas y tiempo. Lo único con costo
+# en dinero es Claude. Una llamada a Claude por respuesta verificada, más una por cada corrección
+
+_COSTOS_COLUMNAS = """
+       count(*)                                                       AS preguntas,
+       count(*) FILTER (WHERE x.desde_cache)                          AS desde_cache,
+       coalesce(sum(x.tokens_entrada), 0)                             AS tokens_entrada,
+       coalesce(sum(x.tokens_salida), 0)                              AS tokens_salida,
+       coalesce(sum(x.llamadas_llm), 0)                               AS llamadas_llm,
+       coalesce(sum(x.segundos_total), 0)::float                      AS segundos_total,
+       (avg(x.segundos_total) FILTER (WHERE NOT x.desde_cache))::float AS segundos_prom,
+       count(a.mensaje_id) FILTER (WHERE NOT a.desde_cache)           AS verificaciones,
+       coalesce(sum(x.correcciones) FILTER (WHERE NOT x.desde_cache), 0) AS correcciones,
+       coalesce(sum(a.tokens_entrada), 0)                             AS claude_tokens_entrada,
+       coalesce(sum(a.tokens_salida), 0)                              AS claude_tokens_salida,
+       coalesce(sum(a.costo_usd), 0)::float                           AS costo_claude,
+       count(*) FILTER (WHERE a.veredicto = 'aprobada')               AS aprobadas,
+       count(*) FILTER (WHERE a.veredicto = 'con_observaciones')      AS con_observaciones,
+       count(*) FILTER (WHERE a.veredicto = 'reprobada')              AS reprobadas"""
+
+_COSTOS_DESDE = """
+  FROM mensajes m
+  JOIN metricas x ON x.mensaje_id = m.id
+  LEFT JOIN auditorias a ON a.mensaje_id = m.id"""
+
+# Cómo se puede ordenar la lista de conversaciones (nombre que manda la interfaz → SQL)
+ORDENES_COSTOS = {
+    "reciente": "max(m.creado_en)",
+    "costo": "coalesce(sum(a.costo_usd), 0)",
+    "tokens": "coalesce(sum(x.tokens_entrada + x.tokens_salida), 0)",
+    "tiempo": "coalesce(sum(x.segundos_total), 0)",
+}
+
+
+async def costos_resumen(grupo: AsyncConnectionPool, desde: datetime | None,
+                         hasta: datetime | None) -> dict:
+    """Totales del periodo: lo que se gastó en Claude y lo que trabajó el modelo local."""
+    filtro, valores = _filtro_fechas(desde, hasta)
+    consulta = (f"SELECT count(DISTINCT m.conversacion_id) AS conversaciones, {_COSTOS_COLUMNAS}"
+                f"{_COSTOS_DESDE} WHERE m.rol = 'agente' {filtro}")
+    async with grupo.connection() as conexion:
+        return await (await conexion.execute(consulta, valores)).fetchone()
+
+
+async def costos_por_conversacion(grupo: AsyncConnectionPool, desde: datetime | None,
+                                  hasta: datetime | None, orden: str, limite: int,
+                                  desplazamiento: int) -> list[dict]:
+    """Una fila por conversación con sus totales, ordenadas por lo que pida el admin."""
+    filtro, valores = _filtro_fechas(desde, hasta)
+    consulta = f"""
+        SELECT c.id, coalesce(c.titulo, '(sin título)') AS titulo,
+               min(m.creado_en) AS inicio, max(m.creado_en) AS ultima, {_COSTOS_COLUMNAS}
+          {_COSTOS_DESDE}
+          JOIN conversaciones c ON c.id = m.conversacion_id
+         WHERE m.rol = 'agente' {filtro}
+         GROUP BY c.id, c.titulo
+         ORDER BY {ORDENES_COSTOS[orden]} DESC, max(m.creado_en) DESC
+         LIMIT %s OFFSET %s"""
+    async with grupo.connection() as conexion:
+        return await (await conexion.execute(consulta, valores + [limite, desplazamiento])
+                      ).fetchall()
+
+
+async def costos_de_conversacion(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID
+                                 ) -> list[dict]:
+    """El desglose de una conversación: cada pregunta con lo que costó responderla."""
+    async with grupo.connection() as conexion:
+        return await (await conexion.execute(
+            "SELECT m.id, m.creado_en, p.contenido AS pregunta, x.modelo, x.tokens_entrada,"
+            " x.tokens_salida, x.llamadas_llm, x.segundos_total::float, x.segundos_busqueda::float,"
+            " x.desde_cache, x.correcciones, x.se_puede_responder, x.error,"
+            " a.modelo AS modelo_auditor, a.veredicto, a.tokens_entrada AS claude_tokens_entrada,"
+            " a.tokens_salida AS claude_tokens_salida, a.costo_usd::float AS costo_claude,"
+            " a.segundos::float AS segundos_claude"
+            f"{_COSTOS_DESDE}"
+            " JOIN LATERAL (SELECT contenido FROM mensajes WHERE conversacion_id = m.conversacion_id"
+            "  AND id < m.id AND rol = 'usuario' ORDER BY id DESC LIMIT 1) p ON true"
+            " WHERE m.conversacion_id = %s AND m.rol = 'agente' ORDER BY m.id",
+            (conversacion_id,))).fetchall()
+
+
 async def lista_de_preguntas(grupo: AsyncConnectionPool, desde: datetime | None,
                              hasta: datetime | None, texto: str | None, limite: int,
                              desplazamiento: int) -> list[dict]:

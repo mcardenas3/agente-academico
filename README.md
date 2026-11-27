@@ -452,6 +452,20 @@ Protegido con `Authorization: Bearer <ADMIN_TOKEN>`. Lee todo de PostgreSQL:
 - la lista de preguntas y respuestas, con buscador, filtro de fechas y el detalle de cada una
   (modelo, llamadas al LLM, tools, consulta a BM25, veredicto y análisis del auditor).
 
+**Costos y desempeño** (`/admin/costos`, botón en el panel). Es una vista resumida para medir
+cuánto cuesta y cómo rinde cada conversación:
+- **Arriba, los totales del periodo:** gasto en Claude (total, por conversación y por pregunta),
+  llamadas a Claude (verificaciones más correcciones), tokens del modelo local y tiempo por
+  pregunta.
+- **Una fila por conversación:** tokens de entrada → salida y llamadas del modelo local, costo y
+  llamadas de Claude, tiempo total y veredictos. Se ordena por más recientes, más caras, más
+  tokens o más lentas.
+- **Al abrir una conversación**, cada pregunta muestra el modelo local (tokens, llamadas,
+  tiempo) y Claude (costo, tokens, cuántas revisiones, tiempo), con su veredicto y si se corrigió.
+
+El modelo local corre en la máquina y no cobra: de él se miden tokens y tiempo. Lo que cuesta
+dinero es Claude.
+
 ---
 
 ## Estructura del repositorio

@@ -24,3 +24,33 @@ export function paginas(lista: number[]) {
 export function fecha(iso: string) {
   return new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
+
+/** Porcentaje entero de una parte sobre un total ("—" si no hay total). */
+export function pct(parte: number | null | undefined, total: number | null | undefined): string {
+  return total ? `${Math.round((100 * (parte ?? 0)) / total)} %` : '—'
+}
+
+/** Dólares con los decimales que hagan falta: las llamadas a Claude cuestan fracciones de centavo. */
+export function dolares(v: number | null | undefined): string {
+  if (v == null) return '—'
+  return `US$${v < 1 ? v.toFixed(4) : v.toFixed(2)}`
+}
+
+/** Rangos de fechas de los paneles de /admin */
+export const RANGOS = [
+  { id: 'hoy', etiqueta: 'Hoy', dias: 0 },
+  { id: '7', etiqueta: '7 días', dias: 7 },
+  { id: '30', etiqueta: '30 días', dias: 30 },
+  { id: 'todo', etiqueta: 'Todo', dias: null },
+] as const
+
+export type Rango = (typeof RANGOS)[number]
+
+/** Inicio del rango (medianoche de hace N días), o undefined para "Todo". */
+export function desdeDe(rango: Rango): string | undefined {
+  if (rango.dias === null) return undefined
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - rango.dias)
+  return d.toISOString()
+}

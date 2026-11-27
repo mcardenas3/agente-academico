@@ -12,7 +12,10 @@ Rutas:
     GET  /api/salud                    estado de cada servicio
     GET  /api/admin/resumen            totales y promedios          ┐
     GET  /api/admin/por-dia            serie diaria para la gráfica ├ piden "Authorization: Bearer <ADMIN_TOKEN>"
-    GET  /api/admin/preguntas          pregunta, respuesta y costo  ┘
+    GET  /api/admin/preguntas          pregunta, respuesta y costo  │
+    GET  /api/admin/costos/resumen     gasto en Claude y tokens     │
+    GET  /api/admin/costos/conversaciones       por conversación    │
+    GET  /api/admin/costos/conversaciones/{id}  por pregunta        ┘
     /                                  la interfaz de React ya compilada (web/dist)
 
 Correr en desarrollo (desde api/, con los servicios encendidos):
@@ -30,6 +33,7 @@ from collections.abc import AsyncIterable
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -318,6 +322,27 @@ async def admin_preguntas(request: Request, desde: datetime | None = None,
                           desplazamiento: int = Query(0, ge=0)) -> list[dict]:
     return await bd.lista_de_preguntas(request.app.state.grupo, desde, hasta, texto, limite,
                                        desplazamiento)
+
+
+@app.get("/api/admin/costos/resumen", dependencies=[Depends(verificar_admin)])
+async def admin_costos_resumen(request: Request, desde: datetime | None = None,
+                               hasta: datetime | None = None) -> dict:
+    return await bd.costos_resumen(request.app.state.grupo, desde, hasta)
+
+
+@app.get("/api/admin/costos/conversaciones", dependencies=[Depends(verificar_admin)])
+async def admin_costos_conversaciones(
+        request: Request, desde: datetime | None = None, hasta: datetime | None = None,
+        orden: Literal["reciente", "costo", "tokens", "tiempo"] = "reciente",
+        limite: int = Query(25, ge=1, le=200), desplazamiento: int = Query(0, ge=0)) -> list[dict]:
+    return await bd.costos_por_conversacion(request.app.state.grupo, desde, hasta, orden, limite,
+                                            desplazamiento)
+
+
+@app.get("/api/admin/costos/conversaciones/{conversacion_id}",
+         dependencies=[Depends(verificar_admin)])
+async def admin_costos_conversacion(conversacion_id: uuid.UUID, request: Request) -> list[dict]:
+    return await bd.costos_de_conversacion(request.app.state.grupo, conversacion_id)
 
 
 # --- La interfaz: al final, para que las rutas /api/* tengan prioridad ---

@@ -1,6 +1,7 @@
 // Íconos de Phosphor importados uno por uno: importar el paquete completo mete los ~1,500 íconos
 // en el bundle aunque solo se usen unos cuantos
 export { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise'
+export { ArrowLeft } from '@phosphor-icons/react/dist/csr/ArrowLeft'
 export { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
 export { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp'
 export { BookOpenText } from '@phosphor-icons/react/dist/csr/BookOpenText'
@@ -15,6 +16,7 @@ export { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
 export { Moon } from '@phosphor-icons/react/dist/csr/Moon'
 export { NotePencil } from '@phosphor-icons/react/dist/csr/NotePencil'
 export { Quotes } from '@phosphor-icons/react/dist/csr/Quotes'
+export { Receipt } from '@phosphor-icons/react/dist/csr/Receipt'
 export { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck'
 export { ShieldWarning } from '@phosphor-icons/react/dist/csr/ShieldWarning'
 export { SignOut } from '@phosphor-icons/react/dist/csr/SignOut'

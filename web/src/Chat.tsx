@@ -5,6 +5,7 @@ import {
 } from './api'
 import { paginas, numero, tiempo, ultimaSeccion } from './formato'
 import Historial from './Historial'
+import { VEREDICTOS } from './piezas'
 import {
   ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, List, MagnifyingGlass, NotePencil, Quotes,
   ShieldCheck, ShieldWarning, Warning,
@@ -316,12 +317,6 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
     </div>
   )
 }
-
-const VEREDICTOS = {
-  aprobada: { texto: 'Aprobada', tono: 'ok' },
-  con_observaciones: { texto: 'Con observaciones', tono: 'warn' },
-  reprobada: { texto: 'Reprobada', tono: 'bad' },
-} as const
 
 const FIDELIDAD = { fiel: 'Fiel', parcialmente_fiel: 'Parcialmente fiel', no_fiel: 'No fiel' } as const
 
