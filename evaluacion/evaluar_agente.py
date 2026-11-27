@@ -1,7 +1,9 @@
-"""Evaluación del agente completo: 25 preguntas con criterios explícitos y un LLM como juez.
+"""Evaluación del agente completo: 25 preguntas con criterios explícitos y Claude como juez.
 
 Uso (desde la carpeta api, con opensearch, vllm y ollama encendidos; tarda ~5 minutos):
-    uv run python ../evaluacion/evaluar_agente.py
+    uv run --env-file ../.env python ../evaluacion/evaluar_agente.py
+    uv run --env-file ../.env python ../evaluacion/evaluar_agente.py --solo-auditoria
+      (vuelve a auditar lo ya guardado, sin correr el agente)
 
 Preguntas:
 - 15 conceptuales en español y 5 de término exacto en inglés: el artículo SÍ las responde, y se
@@ -13,27 +15,29 @@ Criterios por pregunta (se calculan solos):
 - decisión correcta: dijo que se puede responder si y solo si el artículo lo cubre.
 - cita correcta: entre sus citas está al menos un fragmento que de verdad responde la pregunta.
 - idioma correcto: respondió en el idioma de la pregunta.
-Y un juez (el mismo LLM, en una llamada aparte, con los fragmentos citados a la vista):
-- fiel: todo lo que afirma la respuesta está en los fragmentos citados (sí / parcial / no).
-- relevante: qué tanto responde lo que se preguntó (1 a 5).
+Y un juez: el mismo auditor de la API (Claude, api/auditor.py), con todos los fragmentos que
+recuperó la búsqueda a la vista, califica las 25 (también las abstenciones):
+- veredicto: aprobada / con observaciones / reprobada.
+- fidelidad: todo lo que afirma la respuesta está en los fragmentos (fiel / parcial / no fiel).
+- relevancia: qué tanto responde lo que se preguntó (1 a 5).
+- citas correctas y si acertó en responder o abstenerse.
+Antes el juez era el mismo modelo local; se cambió a Claude para no juzgar al modelo con él mismo
+y para no cargar la RAM con una segunda ronda de llamadas a Ollama.
 
 Guarda todo en evaluacion/resultados_agente.json y muestra la tabla y el resumen.
 """
 
+import asyncio
 import json
 import sys
-import time
 from pathlib import Path
-from typing import Literal
 
 CARPETA = Path(__file__).resolve().parent
 sys.path.insert(0, str(CARPETA.parent / "api"))
 
-from pydantic import BaseModel, Field  # noqa: E402
-from pydantic_ai import Agent, ModelSettings, ToolOutput  # noqa: E402
-
-from agente import crear_cliente, idioma_de, modelo, preguntar  # noqa: E402
-from busqueda import INDICE  # noqa: E402
+from agente import Cita, RespuestaCitada, crear_cliente, idioma_de, preguntar  # noqa: E402
+from auditor import ACTIVO, MODELO_AUDITOR, AuditoriaFallida, auditar  # noqa: E402
+from busqueda import traer_fragmentos  # noqa: E402
 
 PREFIJO = "huang2026-rag-survey-"
 
@@ -71,64 +75,53 @@ PREGUNTAS: list[tuple[str, list[int]]] = [
 ]
 
 
-class Veredicto(BaseModel):
-    """Evaluation of an answer against the article fragments it cites."""
-
-    # El motivo va primero para que el modelo compare antes de elegir el veredicto
-    motivo: str = Field(description="First, compare the answer with the fragments in one or two "
-                                    "sentences.")
-    fiel: Literal["si", "parcial", "no"] = Field(
-        description="'si' if every claim in the answer is supported by the fragments, 'parcial' "
-                    "if some claims are not, 'no' if the answer contradicts or ignores them.")
-    relevancia: int = Field(ge=1, le=5, description="How well the answer addresses the question "
-                                                    "(1 = not at all, 5 = completely).")
+# Un solo bucle de asyncio para todas las auditorías: el cliente de Anthropic guarda sus
+# conexiones y no se pueden reusar en otro bucle (asyncio.run crea uno nuevo cada vez)
+BUCLE = asyncio.new_event_loop()
 
 
-# Juez: el mismo modelo (es el único que cabe en la GPU junto con los embeddings). Entrega su
-# veredicto con una tool llamada "calificar", igual que el agente responde con "responder".
-# Medido: con salida JSON obligatoria (NativeOutput) calificó "no" y 1 las 20 respuestas, aunque
-# en su motivo dijera que estaban respaldadas; el formato forzado le quita la capacidad de razonar
-juez = Agent(
-    modelo,
-    output_type=ToolOutput(Veredicto, name="calificar",
-                           description="Give your verdict on the answer."),
-    instructions="You are a strict evaluator of question answering over a scientific article. "
-                 "Judge ONLY with the fragments given; do not use outside knowledge. Give your "
-                 "verdict ONLY by calling the tool `calificar`.",
-    model_settings=ModelSettings(temperature=0, extra_body={"reasoning_effort": "none"}),
-    retries=2,
-)
+def auditar_fila(cliente, fila: dict, respuesta: RespuestaCitada) -> dict:
+    """Le pide a Claude su veredicto sobre una respuesta y lo agrega a la fila."""
+    fragmentos = traer_fragmentos(cliente, respuesta.recuperados) if respuesta.recuperados else []
+    try:
+        a = BUCLE.run_until_complete(auditar(fila["pregunta"], respuesta, fragmentos))
+    except AuditoriaFallida as error:
+        print(f"    no se pudo auditar: {error}", flush=True)
+        return fila
+    return fila | {
+        "auditoria_veredicto": a.veredicto, "auditoria_fidelidad": a.fidelidad,
+        "auditoria_relevancia": a.relevancia, "auditoria_citas_correctas": a.citas_correctas,
+        "auditoria_abstencion_correcta": a.abstencion_correcta,
+        "auditoria_problemas": a.problemas, "auditoria_analisis": a.analisis,
+        "auditoria_costo_usd": a.costo_usd, "auditoria_segundos": a.segundos,
+    }
 
 
-def textos_de(cliente, ids: list[str]) -> str:
-    """Texto de los fragmentos citados, para dárselo al juez."""
-    if not ids:
-        return "(no fragments cited)"
-    docs = cliente.mget(index=INDICE, body={"ids": ids}, _source=["seccion", "texto"])["docs"]
-    return "\n\n".join(f"[{d['_id']}] {d['_source']['seccion']}\n{d['_source']['texto']}"
-                       for d in docs if d.get("found"))
-
-
-def juzgar(cliente, fila: dict) -> dict:
-    """Le pide al juez su veredicto sobre una respuesta y lo agrega a la fila."""
-    inicio = time.perf_counter()
-    v = juez.run_sync(
-        f"Question: {fila['pregunta']}\n\nAnswer to evaluate: {fila['respuesta']}\n\n"
-        f"Article fragments cited by the answer:\n{textos_de(cliente, fila['citas'])}").output
-    return fila | {"juez_fiel": v.fiel, "juez_relevancia": v.relevancia, "juez_motivo": v.motivo,
-                   "juez_segundos": round(time.perf_counter() - inicio, 2)}
+def respuesta_guardada(fila: dict) -> RespuestaCitada:
+    """Rearma lo necesario para auditar una fila ya guardada (sin volver a correr el agente)."""
+    respondio = fila.get("respondio")
+    if respondio is None:  # filas guardadas antes de este campo: se deduce de la decisión
+        respondio = fila["decision_correcta"] == (fila["tipo"] != "no responde")
+    return RespuestaCitada(
+        respuesta=fila["respuesta"], se_puede_responder=respondio,
+        # Al auditor solo le sirve el id de cada cita (para marcar cuáles fragmentos se citaron)
+        citas=[Cita(id=i, seccion="", paginas=[]) for i in fila["citas"]],
+        consulta=None, consulta_en=None, tools_llamadas=[], llamadas_llm=0, tokens_entrada=0,
+        tokens_salida=0, segundos=0, segundos_busqueda=0,
+        recuperados=fila.get("recuperados") or fila["citas"])
 
 
 def main() -> None:
+    if not ACTIVO:
+        sys.exit("Falta CLAUDE_API_KEY: corre con  uv run --env-file ../.env python …")
     cliente = crear_cliente()
     salida = CARPETA / "resultados_agente.json"
-    # Con --solo-juez se vuelve a juzgar lo ya guardado, sin volver a correr el agente
-    if "--solo-juez" in sys.argv:
+    if "--solo-auditoria" in sys.argv:
         guardado = json.loads(salida.read_text(encoding="utf-8"))["preguntas"]
-        resultados = [juzgar(cliente, f) if "juez_fiel" in f else f for f in guardado]
+        resultados = [auditar_fila(cliente, f, respuesta_guardada(f)) for f in guardado]
         for f in resultados:
-            print(f"{f['n']:>2}. juez={f.get('juez_fiel', '-')}/{f.get('juez_relevancia', '-')} | "
-                  f"{f['pregunta'][:60]}", flush=True)
+            print(f"{f['n']:>2}. {f.get('auditoria_veredicto', '-')} | {f['pregunta'][:60]}",
+                  flush=True)
         resumir(resultados, salida)
         return
 
@@ -142,7 +135,9 @@ def main() -> None:
             "pregunta": pregunta,
             "tipo": "no responde" if not relevantes else ("término (en)" if k > 15 else "conceptual (es)"),
             "respuesta": r.respuesta,
+            "respondio": r.se_puede_responder,
             "citas": citados,
+            "recuperados": r.recuperados,
             "fragmentos_correctos": sorted(esperados),
             "busco": "buscar_en_articulo" in r.tools_llamadas,
             "decision_correcta": r.se_puede_responder == bool(relevantes),
@@ -153,14 +148,12 @@ def main() -> None:
             "tokens_salida": r.tokens_salida,
             "error": r.error,
         }
-        # El juez solo califica las que el artículo responde y el agente sí respondió
-        if relevantes and r.se_puede_responder:
-            fila = juzgar(cliente, fila)
+        fila = auditar_fila(cliente, fila, r)
         resultados.append(fila)
         print(f"{k:>2}. {'✓' if fila['decision_correcta'] else '✗'} decisión  "
               f"cita={fila['cita_correcta']}  idioma={'✓' if fila['idioma_correcto'] else '✗'}  "
-              f"juez={fila.get('juez_fiel', '-')}/{fila.get('juez_relevancia', '-')}  "
-              f"{r.segundos:.1f}s | {pregunta[:55]}", flush=True)
+              f"claude={fila.get('auditoria_veredicto', '-')}/{fila.get('auditoria_relevancia', '-')}"
+              f"  {r.segundos:.1f}s | {pregunta[:50]}", flush=True)
     resumir(resultados, salida)
 
 
@@ -172,7 +165,12 @@ def resumir(resultados: list[dict], salida: Path) -> None:
 
     responde = [f for f in resultados if f["tipo"] != "no responde"]
     no_responde = [f for f in resultados if f["tipo"] == "no responde"]
-    juzgadas = [f for f in resultados if "juez_fiel" in f]
+    auditadas = [f for f in resultados if "auditoria_veredicto" in f]
+    n = len(auditadas)
+
+    def cuenta(campo, valor=True):
+        return f"{sum(f[campo] == valor for f in auditadas)}/{n}"
+
     resumen = {
         "preguntas": len(resultados),
         "buscó": porcentaje(resultados, "busco"),
@@ -181,17 +179,23 @@ def resumir(resultados: list[dict], salida: Path) -> None:
         "se abstuvo en las que no cubre": porcentaje(no_responde, "decision_correcta"),
         "cita un fragmento correcto": porcentaje(responde, "cita_correcta"),
         "idioma correcto": porcentaje(resultados, "idioma_correcto"),
-        "juez: fiel (sí)": f"{sum(f['juez_fiel'] == 'si' for f in juzgadas)}/{len(juzgadas)}",
-        "juez: fiel (parcial)": f"{sum(f['juez_fiel'] == 'parcial' for f in juzgadas)}/{len(juzgadas)}",
-        "juez: relevancia promedio": round(sum(f["juez_relevancia"] for f in juzgadas)
-                                           / max(len(juzgadas), 1), 2),
+        f"claude ({MODELO_AUDITOR}): aprobadas": cuenta("auditoria_veredicto", "aprobada"),
+        "claude: con observaciones": cuenta("auditoria_veredicto", "con_observaciones"),
+        "claude: reprobadas": cuenta("auditoria_veredicto", "reprobada"),
+        "claude: fiel": cuenta("auditoria_fidelidad", "fiel"),
+        "claude: parcialmente fiel": cuenta("auditoria_fidelidad", "parcialmente_fiel"),
+        "claude: citas correctas": cuenta("auditoria_citas_correctas"),
+        "claude: acertó en responder/abstenerse": cuenta("auditoria_abstencion_correcta"),
+        "claude: relevancia promedio": round(sum(f["auditoria_relevancia"] for f in auditadas)
+                                             / max(n, 1), 2),
+        "claude: costo total (US$)": round(sum(f["auditoria_costo_usd"] for f in auditadas), 4),
         "segundos promedio": round(sum(f["segundos"] for f in resultados) / len(resultados), 2),
         "tokens de entrada promedio": round(sum(f["tokens_entrada"] for f in resultados)
                                             / len(resultados)),
     }
     print("\nResumen")
     for clave, valor in resumen.items():
-        print(f"  {clave:<34}{valor}")
+        print(f"  {clave:<44}{valor}")
 
     salida.write_text(json.dumps({"resumen": resumen, "preguntas": resultados},
                                  ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -1,8 +1,9 @@
 # Agente académico
 
 Agente que responde preguntas sobre un artículo científico, con la sección y la página de donde sale
-cada respuesta. Tiene un chat en React, un panel `/admin` con estadísticas, y todo el sistema
-levanta con un solo `docker compose up`.
+cada respuesta. Cada respuesta la audita después Claude (API de Anthropic) contra los fragmentos
+recuperados. Tiene un chat en React, un panel `/admin` con estadísticas, y todo el sistema levanta
+con un solo `docker compose up`.
 
 **Artículo:** Huang, Y. y Huang, J. X. (2026). *A Survey on Retrieval-Augmented Text Generation for
 Large Language Models*. **ACM Computing Surveys** 58(12), artículo 300, pp. 1–38.
@@ -39,6 +40,7 @@ flowchart LR
     G -->|búsqueda híbrida| S[(OpenSearch<br/>BM25 + k-NN)]
     A -->|conversaciones, mensajes,<br/>métricas y citas| P[(PostgreSQL)]
     A -->|caché de respuestas<br/>e historial reciente| R[(Redis)]
+    A -->|auditoría después<br/>de responder| C[API de Claude<br/>claude-haiku-5-5]
     H[Hugging Face Hub] -. pesos .-> V
     subgraph ingesta [Ingesta · una sola vez]
         PDF[PDF] --> D[Docling] --> F[fragmentos.jsonl]
@@ -64,6 +66,8 @@ Recorrido de una pregunta:
 7. Cada cita es un enlace que abre el PDF del artículo (`/articulo.pdf#page=N`) en la página del
    texto citado. Con «Ver el texto citado» se despliega el texto exacto de cada fragmento en que se
    basó la respuesta (`GET /api/fragmentos`), para comparar la respuesta con su fuente.
+8. Ya con la respuesta en pantalla, Claude la audita contra los 5 fragmentos recuperados y su
+   veredicto llega por el mismo SSE (ver [Auditor con Claude](#auditor-con-claude)).
 
 **Historial sin login.** Cada navegador recibe un id aleatorio (en su `localStorage`) y la barra
 lateral muestra solo sus conversaciones, tituladas con la primera pregunta. Quitar una del
@@ -81,6 +85,7 @@ historial la marca como `oculta`: sus mensajes y métricas se conservan para `/a
 | **Pydantic AI** 2.75 | El agente: tools, salida tipada, validación con reintentos y memoria de la conversación |
 | **PostgreSQL** 17 | Conversaciones, mensajes, métricas y citas (esquema normalizado) |
 | **Redis** 7 | Caché de respuestas e historial reciente de cada conversación |
+| **API de Claude** (Anthropic) | Audita cada respuesta y es el juez de la evaluación; corre en la nube, sin usar la RAM ni la GPU de la máquina |
 | **React** 19 + Vite | Chat y panel `/admin` |
 | **Docker** | 8 servicios (uno solo descarga el LLM y termina) con healthchecks, volúmenes y variables en `.env` |
 | **ngrok** | URL pública HTTPS para la demo |
@@ -107,6 +112,9 @@ como `healthy` en `docker compose ps`, todo está listo.
 | `ADMIN_TOKEN` | Token para entrar al panel `/admin` |
 | `NGROK_AUTHTOKEN` | Token de la cuenta de ngrok ([dónde sacarlo](https://dashboard.ngrok.com/get-started/your-authtoken)) |
 | `NGROK_URL` | Opcional: dominio fijo de la cuenta de ngrok (p. ej. `https://algo.ngrok-free.dev`); sin él, la URL cambia en cada arranque |
+| `CLAUDE_API_KEY` | Opcional: llave de la [API de Claude](https://console.anthropic.com) para el auditor; sin ella, el chat funciona igual, sin auditoría |
+| `MODELO_AUDITOR` | Opcional: modelo que audita (por defecto `claude-haiku-5-5`) |
+| `LIMITE_AUDITORIAS_DIA` | Opcional: tope de auditorías nuevas por día (por defecto 200) |
 
 - **Chat:** http://127.0.0.1:8080
 - **Panel:** http://127.0.0.1:8080/admin (pide el `ADMIN_TOKEN`)
@@ -271,26 +279,71 @@ Los resultados completos, pregunta por pregunta, están en
 [`evaluacion/resultados_agente.json`](evaluacion/resultados_agente.json).
 
 ```bash
-cd api && uv run python ../evaluacion/evaluar_agente.py
+cd api && uv run --env-file ../.env python ../evaluacion/evaluar_agente.py
 ```
 
-| Criterio | Resultado |
+| Criterio (calculado solo) | Resultado |
 |---|---|
 | Buscó en el artículo antes de responder | **25/25** |
 | Respondió las que el artículo sí cubre | **20/20** |
 | Citó al menos un fragmento correcto (fijado de antemano) | **20/20** |
 | Respondió en el idioma de la pregunta | **25/25** |
 | Se abstuvo en las que el artículo no cubre | **3/5** |
-| LLM como juez: respuesta fiel a los fragmentos citados | 17/20 sí · 2 parcial · 1 no |
-| LLM como juez: relevancia (1–5) | **4.9** |
-| Tiempo promedio por pregunta | 6.2 s |
+| Tiempo promedio por pregunta | 5.3 s |
 
-- En las 2 abstenciones fallidas, el agente sí dijo que el artículo no trata el tema («Los autores
-  no expresan una opinión sobre las criptomonedas»), pero las marcó como respondibles.
-- **El juez es el mismo LLM** de 4b, porque es el único que cabe en la GPU. Se le da la pregunta,
-  la respuesta y el texto de los fragmentos citados.
-- Con salida JSON forzada, el juez calificaba todo como «no» y 1. Por eso entrega su veredicto con
-  una tool y razona antes de calificar.
+El juez es el [auditor](#auditor-con-claude) (`claude-haiku-5-5`). Califica las 25 respuestas,
+abstenciones incluidas, con los 5 fragmentos recuperados a la vista:
+
+| Criterio (Claude como juez) | Resultado |
+|---|---|
+| Veredicto | **15 aprobadas** · 8 con observaciones · 2 reprobadas |
+| Fiel a los fragmentos | **21/25** · 4 parcialmente fiel · 0 no fiel |
+| Citas que sostienen la respuesta | **24/25** |
+| Acertó al responder o abstenerse | **23/25** |
+| Relevancia (1–5) | **4.64** |
+| Costo de las 25 auditorías | US$0.018 |
+
+- **El juez coincide con los criterios automáticos.** Claude no sabe cuáles preguntas están fuera
+  del artículo, y aun así reprobó justo las 2 abstenciones fallidas (GPT-7 en MMLU y las
+  criptomonedas). Su «acertó al responder o abstenerse» da 23/25, igual que el criterio calculado.
+  En esas dos, el agente sí dijo que el artículo no trata el tema, pero las marcó como respondibles.
+- Las 8 «con observaciones» son detalles: una frase que generaliza un ejemplo (FLARE como si fuera
+  toda la recuperación adaptativa), un término que no aparece en los fragmentos, o una lista con
+  repetidos. Ninguna respuesta contradice al artículo.
+- Antes, el juez era el mismo LLM local de 4b. Ese juez calificaba 17/20 como fieles, pero solo
+  revisaba las 20 respuestas, no las abstenciones, y se juzgaba a sí mismo. Con salida JSON forzada
+  calificaba todo como «no» y 1. Pasar a Claude da un juez independiente y más capaz, y no carga
+  la RAM con una segunda ronda de llamadas a Ollama.
+
+---
+
+## Auditor con Claude
+
+Después de cada respuesta, la API le pide a Claude, por la
+[API de Anthropic](https://docs.claude.com), que la revise ([`api/auditor.py`](api/auditor.py)).
+Claude recibe la pregunta, los **5 fragmentos que recuperó la búsqueda** (marcados como citados o
+no) y la respuesta. Con eso devuelve un veredicto con salida estructurada, que el SDK valida contra
+un modelo de Pydantic:
+
+| Campo | Qué revisa |
+|---|---|
+| `fidelidad` | Que todo lo que afirma esté en los fragmentos: `fiel`, `parcialmente_fiel` o `no_fiel` |
+| `relevancia` | Qué tanto responde lo que se preguntó (1 a 5) |
+| `citas_correctas` | Que los fragmentos citados de verdad sostengan la respuesta |
+| `abstencion_correcta` | Que acertara al contestar o al decir que el artículo no lo cubre |
+| `veredicto` | `aprobada`, `con_observaciones` o `reprobada`, con la lista de problemas y un resumen |
+
+- **No hace esperar al usuario.** La respuesta se muestra en cuanto está lista y la auditoría llega
+  2 a 4 s después por el mismo SSE. En el chat aparece como «Aprobada · Auditada por Claude» y se
+  despliega con el detalle. Se guarda en la tabla `auditorias` y alimenta el panel `/admin`.
+- **Corre en la nube.** No ocupa la RAM ni la GPU de la máquina, donde ya están vLLM y Ollama.
+- **Costo.** Usa `claude-haiku-5-5` (US$0.10 por millón de tokens de entrada y US$0.50 de salida).
+  Cada auditoría cuesta unos US$0.0006, con ~4,000 tokens de entrada. Se cambia con
+  `MODELO_AUDITOR`, y el panel muestra el gasto acumulado.
+- **No paga dos veces.** Una respuesta que sale de la caché de Redis reusa su auditoría. Además, un
+  tope diario (`LIMITE_AUDITORIAS_DIA`) protege el saldo si la URL pública recibe muchas preguntas.
+- **Si falla, no estorba.** Sin llave, sin saldo o sin red, el chat funciona igual y solo dice «No
+  se pudo auditar esta respuesta».
 
 ---
 
@@ -303,10 +356,12 @@ erDiagram
     conversaciones ||--o{ mensajes : tiene
     mensajes ||--o| metricas : "si es del agente"
     mensajes ||--o{ citas : "si es del agente"
+    mensajes ||--o| auditorias : "si es del agente"
     conversaciones { uuid id PK  timestamptz creada_en  uuid cliente_id  text titulo  timestamptz actualizada_en  bool oculta }
     mensajes { bigint id PK  uuid conversacion_id FK  text rol  text contenido  timestamptz creado_en }
     metricas { bigint mensaje_id PK  text modelo  int tokens_entrada  int tokens_salida  int llamadas_llm  real segundos_total  real segundos_busqueda  bool se_puede_responder  bool desde_cache  text consulta_en  text_arr tools  text error }
     citas { bigint id PK  bigint mensaje_id FK  text fragmento_id  text seccion  int_arr paginas }
+    auditorias { bigint mensaje_id PK  text modelo  text veredicto  text fidelidad  smallint relevancia  bool citas_correctas  bool abstencion_correcta  text_arr problemas  text resumen  text analisis  numeric costo_usd  bool desde_cache }
 ```
 
 **Redis** tiene dos usos:
@@ -315,6 +370,8 @@ erDiagram
   **Efecto medido:** 2 ms con la caché contra 7.4 s sin ella. El panel lo muestra en vivo.
 - **Historial reciente** de cada conversación (los últimos 3 turnos), para no consultar PostgreSQL
   en cada pregunta.
+- **Auditorías.** Junto a cada respuesta en caché va su auditoría: si la respuesta se repite, no se
+  le vuelve a pagar a Claude. También lleva el contador del tope diario de auditorías.
 
 ---
 
@@ -327,18 +384,20 @@ Protegido con `Authorization: Bearer <ADMIN_TOKEN>`. Lee todo de PostgreSQL:
 - porcentaje de respuestas desde caché, con su latencia comparada;
 - preguntas fuera del artículo y errores;
 - una gráfica por día;
+- la auditoría con Claude: porcentaje de respuestas aprobadas, fieles y con citas correctas,
+  relevancia promedio y cuánto se ha gastado en la API;
 - la lista de preguntas y respuestas, con buscador, filtro de fechas y el detalle de cada una
-  (modelo, llamadas al LLM, tools, consulta a BM25).
+  (modelo, llamadas al LLM, tools, consulta a BM25, veredicto y análisis del auditor).
 
 ---
 
 ## Estructura del repositorio
 
 ```
-api/            agente (Pydantic AI), búsqueda, API de FastAPI, esquema SQL, caché
+api/            agente (Pydantic AI), búsqueda, auditor (Claude), API de FastAPI, esquema SQL, caché
 web/            interfaz en React (chat y /admin)
 ingesta/        PDF → fragmentos con Docling, creación del índice
-evaluacion/     evaluación del agente (25 preguntas + LLM como juez) y sus resultados
+evaluacion/     evaluación del agente (25 preguntas + Claude como juez) y sus resultados
 experimentos/   experimentos que respaldan cada decisión (tablas, fragmentos, búsqueda, agente)
 datos/          el artículo, los fragmentos y las traducciones de la evaluación
 docs/evidencia/ captura del cuartil Q1
@@ -352,5 +411,7 @@ pruebas/        peticiones de prueba para Ollama (tool calling) y vLLM (un embed
 - El algoritmo 2 se leyó como tabla, y algunos de sus pasos quedan fuera de orden.
 - La respuesta llega completa al final, porque el LLM responde con una llamada a tool. Lo que se
   transmite en vivo es el progreso: qué buscó y cuándo está redactando.
-- El juez es el mismo modelo que responde. Un juez más grande sería más confiable, pero no cabe en
-  esta GPU.
+- El auditor solo ve los 5 fragmentos recuperados, no el artículo completo: si la búsqueda no trajo
+  el fragmento correcto, puede dar por buena una abstención que no lo era.
+- La auditoría depende de la API de Claude (red y saldo). Si falla, la respuesta se muestra igual
+  con el aviso «No se pudo auditar esta respuesta».

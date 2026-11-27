@@ -13,9 +13,28 @@ export type Respuesta = {
   segundos_busqueda: number
   desde_cache: boolean
   error: string | null
+  mensaje_id: number
+  auditando: boolean  // true = después llega la auditoría de Claude
 }
 
-export type MensajeGuardado = { id: number; rol: 'usuario' | 'agente'; contenido: string; citas: Cita[] }
+/** El veredicto de Claude sobre una respuesta, revisada contra los fragmentos recuperados. */
+export type Auditoria = {
+  veredicto: 'aprobada' | 'con_observaciones' | 'reprobada'
+  fidelidad: 'fiel' | 'parcialmente_fiel' | 'no_fiel'
+  relevancia: number
+  citas_correctas: boolean
+  abstencion_correcta: boolean
+  problemas: string[]
+  resumen: string
+  analisis: string
+  modelo: string
+  costo_usd: number
+  desde_cache: boolean
+}
+
+export type MensajeGuardado = {
+  id: number; rol: 'usuario' | 'agente'; contenido: string; citas: Cita[]; auditoria: Auditoria | null
+}
 
 // --- Historial sin login: cada navegador tiene un id aleatorio y ve solo sus conversaciones ---
 
@@ -62,6 +81,8 @@ type Manejadores = {
   buscando: (consulta: string) => void
   respuesta: (r: Respuesta) => void
   error: (mensaje: string) => void
+  // Llega después de la respuesta: el veredicto, o null si no se pudo auditar
+  auditoria: (mensajeId: number, a: Auditoria | null) => void
 }
 
 /** Manda la pregunta y va llamando a los manejadores conforme llegan los eventos SSE. */
@@ -104,6 +125,8 @@ export async function preguntar(pregunta: string, conversacionId: string | null,
       else if (evento === 'buscando') m.buscando(d.argumentos?.consulta_en ?? '')
       else if (evento === 'respuesta') { m.respuesta(d); terminado = true }
       else if (evento === 'error') { m.error(d.mensaje); terminado = true }
+      else if (evento === 'auditoria') m.auditoria(d.mensaje_id, d)
+      else if (evento === 'auditoria_error' || evento === 'auditoria_omitida') m.auditoria(d.mensaje_id, null)
     }
   }
   if (!terminado) m.error('La conexión se cortó antes de terminar.')
@@ -141,6 +164,20 @@ export type Resumen = {
   desde_cache: number
   sin_respuesta: number
   errores: number
+  auditoria: ResumenAuditoria
+}
+
+export type ResumenAuditoria = {
+  auditadas: number
+  aprobadas: number
+  con_observaciones: number
+  reprobadas: number
+  fieles: number
+  citas_correctas: number
+  abstencion_correcta: number
+  relevancia_prom: number | null
+  costo_usd: number
+  segundos_prom: number | null
 }
 
 export type Dia = { dia: string; preguntas: number; segundos_prom: number; tokens_entrada: number; tokens_salida: number }
@@ -161,6 +198,7 @@ export type FilaPregunta = {
   consulta_en: string | null
   error: string | null
   modelo: string
+  auditoria: Auditoria | null
 }
 
 export class NoAutorizado extends Error {}

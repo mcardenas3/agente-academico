@@ -2,7 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { admin, NoAutorizado, type Dia, type FilaPregunta, type Resumen } from './api'
 import { fecha, numero, tiempo } from './formato'
-import { Lightning, LockSimple, MagnifyingGlass, SignOut } from './iconos'
+import { Lightning, LockSimple, MagnifyingGlass, ShieldCheck, ShieldWarning, SignOut } from './iconos'
+
+const VEREDICTOS = {
+  aprobada: { texto: 'Aprobada', tono: 'ok' },
+  con_observaciones: { texto: 'Con observaciones', tono: 'warn' },
+  reprobada: { texto: 'Reprobada', tono: 'bad' },
+} as const
+
+/** Porcentaje entero de una parte sobre un total ("—" si no hay total). */
+function pct(parte: number | undefined, total: number | undefined): string {
+  return total ? `${Math.round((100 * (parte ?? 0)) / total)} %` : '—'
+}
+
+/** Dólares con los decimales que hagan falta: las auditorías cuestan fracciones de centavo. */
+function dolares(v: number | undefined): string {
+  if (v === undefined) return '—'
+  return `US$${v < 1 ? v.toFixed(4) : v.toFixed(2)}`
+}
 
 const LLAVE_TOKEN = 'admin_token'
 const POR_PAGINA = 25
@@ -107,6 +124,7 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
   }
 
   const r = resumen
+  const a = r?.auditoria
   const porcentajeCache = r && r.preguntas ? Math.round((100 * r.desde_cache) / r.preguntas) : 0
 
   return (
@@ -138,6 +156,21 @@ function Panel({ token, oscuro, onSalir }: { token: string; oscuro: boolean; onS
           <Kpi titulo="Fuera del artículo" valor={numero(r?.sin_respuesta)} detalle="preguntas que no cubre" />
           <Kpi titulo="Errores" valor={numero(r?.errores)} detalle="sin respuesta válida del LLM" />
           <Kpi titulo="Tiempo con caché" valor={tiempo(r?.segundos_prom)} detalle="promedio de todas" />
+        </div>
+
+        <div className="mt-6 flex items-baseline gap-2">
+          <h2 className="text-body font-bold text-ink">Auditoría con Claude</h2>
+          <span className="text-micro text-ink-faint">cada respuesta revisada contra los fragmentos que recuperó la búsqueda</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Kpi titulo="Aprobadas" valor={pct(a?.aprobadas, a?.auditadas)}
+            detalle={`${numero(a?.con_observaciones)} con observaciones · ${numero(a?.reprobadas)} reprobadas`} />
+          <Kpi titulo="Fieles al artículo" valor={pct(a?.fieles, a?.auditadas)}
+            detalle={`citas correctas ${pct(a?.citas_correctas, a?.auditadas)}`} />
+          <Kpi titulo="Relevancia" valor={a?.relevancia_prom != null ? `${a.relevancia_prom.toFixed(1)} / 5` : '—'}
+            detalle={`acertó en responder o abstenerse ${pct(a?.abstencion_correcta, a?.auditadas)}`} />
+          <Kpi titulo="Costo de Claude" valor={dolares(a?.costo_usd)}
+            detalle={`${numero(a?.auditadas)} auditadas · ${tiempo(a?.segundos_prom)} cada una`} />
         </div>
 
         <div className="card mt-3 p-4">
@@ -206,7 +239,24 @@ function FilaDetalle({ f }: { f: FilaPregunta }) {
             : <span className="tabular-nums">{numero(f.tokens_entrada)} → {numero(f.tokens_salida)} tokens</span>}
           {!f.se_puede_responder && <span className="chip" data-tone="warn">Fuera del artículo</span>}
           {f.error && <span className="chip" data-tone="bad">Error</span>}
+          {f.auditoria && (
+            <span className="chip" data-tone={VEREDICTOS[f.auditoria.veredicto].tono}>
+              {f.auditoria.veredicto === 'aprobada' ? <ShieldCheck size={11} weight="bold" /> : <ShieldWarning size={11} weight="bold" />}
+              {VEREDICTOS[f.auditoria.veredicto].texto}
+            </span>
+          )}
         </div>
+        {abierta && f.auditoria && (
+          <div className="mt-3 rounded-[10px] bg-raised px-3 py-2.5 text-micro">
+            <div className="text-ink-faint">Auditoría ({f.auditoria.modelo})</div>
+            <p className="m-0 mt-0.5 text-meta text-ink">{f.auditoria.analisis}</p>
+            {f.auditoria.problemas.length > 0 && (
+              <ul className="m-0 mt-1.5 list-disc pl-5 text-ink-muted">
+                {f.auditoria.problemas.map((p) => <li key={p}>{p}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
         {abierta && !f.desde_cache && (
           <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 rounded-[10px] bg-raised px-3 py-2.5 text-micro sm:grid-cols-4">
             <Dato nombre="Modelo" valor={f.modelo} />

@@ -9,6 +9,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from agente import MODELO_LLM, RespuestaCitada, Turno
+from auditor import Auditoria
 
 # postgresql://usuario:clave@servidor:puerto/base. Dentro de Docker el servidor es "postgres"
 URL_BASE_DATOS = os.environ.get(
@@ -100,6 +101,33 @@ async def guardar_turno(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID, 
     return mensaje_id
 
 
+async def guardar_auditoria(grupo: AsyncConnectionPool, mensaje_id: int, auditoria: Auditoria,
+                            desde_cache: bool) -> None:
+    """Guarda el veredicto de Claude sobre una respuesta del agente."""
+    a = auditoria
+    async with grupo.connection() as conexion:
+        await conexion.execute(
+            "INSERT INTO auditorias (mensaje_id, modelo, veredicto, fidelidad, relevancia,"
+            " citas_correctas, abstencion_correcta, problemas, resumen, analisis, tokens_entrada,"
+            " tokens_salida, costo_usd, segundos, desde_cache)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " ON CONFLICT (mensaje_id) DO NOTHING",
+            (mensaje_id, a.modelo, a.veredicto, a.fidelidad, a.relevancia, a.citas_correctas,
+             a.abstencion_correcta, a.problemas, a.resumen, a.analisis, a.tokens_entrada,
+             a.tokens_salida, a.costo_usd, a.segundos, desde_cache))
+
+
+# La auditoría de un mensaje como objeto JSON (NULL si no se auditó), para pegarla a cada fila
+_AUDITORIA_JSON = """(
+    SELECT json_build_object('veredicto', a.veredicto, 'fidelidad', a.fidelidad,
+                             'relevancia', a.relevancia, 'citas_correctas', a.citas_correctas,
+                             'abstencion_correcta', a.abstencion_correcta,
+                             'problemas', a.problemas, 'resumen', a.resumen,
+                             'analisis', a.analisis, 'modelo', a.modelo,
+                             'costo_usd', a.costo_usd::float, 'desde_cache', a.desde_cache)
+      FROM auditorias a WHERE a.mensaje_id = m.id) AS auditoria"""
+
+
 async def ultimos_turnos(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID, cuantos: int
                          ) -> list[Turno]:
     """Los últimos turnos (pregunta + respuesta) de una conversación, del más viejo al más nuevo.
@@ -119,12 +147,14 @@ async def ultimos_turnos(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID,
 
 
 async def mensajes_de(grupo: AsyncConnectionPool, conversacion_id: uuid.UUID) -> list[dict]:
-    """Todos los mensajes de una conversación con sus citas, para volver a pintarla."""
+    """Todos los mensajes de una conversación con sus citas y su auditoría, para volver a
+    pintarla."""
     async with grupo.connection() as conexion:
         return await (await conexion.execute(
             "SELECT m.id, m.rol, m.contenido, m.creado_en,"
             " COALESCE(json_agg(json_build_object('id', c.fragmento_id, 'seccion', c.seccion,"
-            "  'paginas', c.paginas) ORDER BY c.id) FILTER (WHERE c.id IS NOT NULL), '[]') AS citas"
+            "  'paginas', c.paginas) ORDER BY c.id) FILTER (WHERE c.id IS NOT NULL), '[]') AS citas,"
+            f" {_AUDITORIA_JSON}"
             " FROM mensajes m LEFT JOIN citas c ON c.mensaje_id = m.id"
             " WHERE m.conversacion_id = %s GROUP BY m.id ORDER BY m.id",
             (conversacion_id,))).fetchall()
@@ -166,8 +196,24 @@ async def resumen(grupo: AsyncConnectionPool, desde: datetime | None, hasta: dat
                count(*) FILTER (WHERE x.error IS NOT NULL)            AS errores
           FROM mensajes m JOIN metricas x ON x.mensaje_id = m.id
          WHERE m.rol = 'agente' {filtro}"""
+    # Lo que dijo el auditor (Claude) en el mismo periodo
+    consulta_auditorias = f"""
+        SELECT count(*)                                              AS auditadas,
+               count(*) FILTER (WHERE a.veredicto = 'aprobada')          AS aprobadas,
+               count(*) FILTER (WHERE a.veredicto = 'con_observaciones') AS con_observaciones,
+               count(*) FILTER (WHERE a.veredicto = 'reprobada')         AS reprobadas,
+               count(*) FILTER (WHERE a.fidelidad = 'fiel')              AS fieles,
+               count(*) FILTER (WHERE a.citas_correctas)                 AS citas_correctas,
+               count(*) FILTER (WHERE a.abstencion_correcta)             AS abstencion_correcta,
+               avg(a.relevancia)::float                                  AS relevancia_prom,
+               coalesce(sum(a.costo_usd), 0)::float                      AS costo_usd,
+               avg(a.segundos) FILTER (WHERE NOT a.desde_cache)          AS segundos_prom
+          FROM auditorias a JOIN mensajes m ON m.id = a.mensaje_id
+         WHERE true {filtro}"""
     async with grupo.connection() as conexion:
-        return await (await conexion.execute(consulta, valores)).fetchone()
+        fila = await (await conexion.execute(consulta, valores)).fetchone()
+        fila["auditoria"] = await (await conexion.execute(consulta_auditorias, valores)).fetchone()
+        return fila
 
 
 async def por_dia(grupo: AsyncConnectionPool, desde: datetime | None, hasta: datetime | None
@@ -198,7 +244,7 @@ async def lista_de_preguntas(grupo: AsyncConnectionPool, desde: datetime | None,
         SELECT m.id, m.creado_en, m.conversacion_id, p.contenido AS pregunta,
                m.contenido AS respuesta, x.tokens_entrada, x.tokens_salida, x.segundos_total,
                x.segundos_busqueda, x.se_puede_responder, x.desde_cache, x.llamadas_llm,
-               x.tools, x.consulta_en, x.error, x.modelo
+               x.tools, x.consulta_en, x.error, x.modelo, {_AUDITORIA_JSON}
           FROM mensajes m
           JOIN metricas x ON x.mensaje_id = m.id
           JOIN LATERAL (SELECT contenido FROM mensajes

@@ -123,6 +123,10 @@ services:
       URL_EMBED: http://vllm:8000/v2/embed
       URL_OLLAMA: http://ollama:11434/v1
       ADMIN_TOKEN: ${ADMIN_TOKEN}               # Token del panel /admin (en .env)
+      # Auditor con la API de Claude (opcional): sin llave, el chat funciona igual, sin auditoría
+      ANTHROPIC_API_KEY: ${CLAUDE_API_KEY:-}
+      MODELO_AUDITOR: ${MODELO_AUDITOR:-claude-haiku-5-5}
+      LIMITE_AUDITORIAS_DIA: ${LIMITE_AUDITORIAS_DIA:-200}  # Tope de auditorías nuevas por día (cuida el saldo)
     ports:
       - "127.0.0.1:8080:8080"                   # La app en http://127.0.0.1:8080, solo local (afuera se entra por ngrok)
     depends_on:                                 # Arranca cuando todo lo demás ya responde

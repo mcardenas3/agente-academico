@@ -161,6 +161,9 @@ class RespuestaCitada(BaseModel):
     segundos: float             # tiempo total de la pregunta
     segundos_busqueda: float    # de ellos, dentro de las tools (vectorizar + OpenSearch)
     error: str | None = None    # si el modelo no logró entregar una respuesta válida
+    # Todos los fragmentos que devolvió la búsqueda (citados o no): el auditor los revisa para
+    # saber si había con qué contestar
+    recuperados: list[str] = []
 
 
 modelo = OllamaModel(MODELO_LLM, provider=OllamaProvider(base_url=URL_OLLAMA))
@@ -329,6 +332,7 @@ def _armar_respuesta(pregunta: str, salida: Respuesta | None, mensajes: list[Mod
         segundos=round(segundos, 2),
         segundos_busqueda=round(dependencias.segundos_busqueda, 2),
         error=error,
+        recuperados=list(vistos),
     )
 
 

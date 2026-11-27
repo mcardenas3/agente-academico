@@ -3,9 +3,10 @@
 --
 --   conversaciones 1 ── n mensajes 1 ── 0..1 metricas
 --                                  1 ── n citas
+--                                  1 ── 0..1 auditorias
 --
--- Cada pregunta del usuario y cada respuesta del agente es una fila de "mensajes". Las métricas y
--- las citas cuelgan solo de los mensajes del agente.
+-- Cada pregunta del usuario y cada respuesta del agente es una fila de "mensajes". Las métricas,
+-- las citas y las auditorías cuelgan solo de los mensajes del agente.
 
 CREATE TABLE IF NOT EXISTS conversaciones (
     id              UUID PRIMARY KEY,
@@ -60,3 +61,23 @@ CREATE TABLE IF NOT EXISTS citas (
 );
 COMMENT ON TABLE citas IS 'Fragmentos del artículo en que se basa cada respuesta';
 CREATE INDEX IF NOT EXISTS citas_por_mensaje ON citas (mensaje_id);
+
+CREATE TABLE IF NOT EXISTS auditorias (
+    mensaje_id           BIGINT PRIMARY KEY REFERENCES mensajes (id) ON DELETE CASCADE,
+    modelo               TEXT NOT NULL,         -- modelo de Claude que auditó
+    veredicto            TEXT NOT NULL CHECK (veredicto IN ('aprobada', 'con_observaciones', 'reprobada')),
+    fidelidad            TEXT NOT NULL CHECK (fidelidad IN ('fiel', 'parcialmente_fiel', 'no_fiel')),
+    relevancia           SMALLINT NOT NULL CHECK (relevancia BETWEEN 1 AND 5),
+    citas_correctas      BOOLEAN NOT NULL,      -- los fragmentos citados sostienen la respuesta
+    abstencion_correcta  BOOLEAN NOT NULL,      -- acertó al contestar o al decir que no lo cubre
+    problemas            TEXT[] NOT NULL,
+    resumen              TEXT NOT NULL,         -- una frase, la que ve el usuario
+    analisis             TEXT NOT NULL,
+    tokens_entrada       INTEGER NOT NULL,      -- 0 si se reusó de la caché
+    tokens_salida        INTEGER NOT NULL,
+    costo_usd            NUMERIC(10, 6) NOT NULL,
+    segundos             REAL NOT NULL,
+    desde_cache          BOOLEAN NOT NULL,      -- true = la misma respuesta ya se había auditado
+    creada_en            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE auditorias IS 'Revisión de cada respuesta hecha por Claude contra los fragmentos recuperados';

@@ -2,7 +2,8 @@
 
 Rutas:
     POST /api/chat                     pregunta → eventos SSE ("conversacion", "buscando",
-                                       "respuesta" o "error")
+                                       "respuesta" o "error"; después de la respuesta,
+                                       "auditoria", "auditoria_omitida" o "auditoria_error")
     GET  /api/conversaciones?cliente_id=…  historial de un navegador (sin login)
     GET  /api/conversaciones/{id}      mensajes de una conversación, para volver a pintarla
     DELETE /api/conversaciones/{id}?cliente_id=…  la quita del historial (no borra datos)
@@ -36,6 +37,7 @@ from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, Field
 
+import auditor
 import base_datos as bd
 import cache
 from agente import (
@@ -57,6 +59,9 @@ CARPETA_WEB = Path(os.environ.get("CARPETA_WEB", Path(__file__).resolve().parent
 # El artículo en PDF, para que las citas abran la página exacta (/articulo.pdf#page=16)
 ARCHIVO_PDF = Path(os.environ.get(
     "ARCHIVO_PDF", Path(__file__).resolve().parent.parent / "datos" / "huang2026-rag-survey.pdf"))
+# Tope de auditorías nuevas por día, para que el saldo de la API de Claude no se acabe si la
+# página pública recibe muchas preguntas (200 × ~US$0.0006 ≈ US$0.12 al día con Haiku)
+LIMITE_AUDITORIAS_DIA = int(os.environ.get("LIMITE_AUDITORIAS_DIA", "200"))
 
 
 async def calentar() -> None:
@@ -149,12 +154,52 @@ async def chat(entrada: Pregunta, request: Request) -> AsyncIterable[ServerSentE
                                       turnos + [Turno(pregunta=pregunta,
                                                       respuesta=respuesta.respuesta)])
         yield ServerSentEvent(event="respuesta", data={
-            **respuesta.model_dump(), "desde_cache": desde_cache, "mensaje_id": mensaje_id})
+            **respuesta.model_dump(), "desde_cache": desde_cache, "mensaje_id": mensaje_id,
+            "auditando": auditor.ACTIVO})
     except Exception as error:  # un servicio caído: se le avisa a la interfaz en vez de colgarse
         registro.exception("Falló /api/chat")
         yield ServerSentEvent(event="error", data={
             "mensaje": "No se pudo responder: un servicio no está disponible. "
                        "Intenta de nuevo en un momento.", "detalle": type(error).__name__})
+        return
+
+    # 4. Claude audita la respuesta. Va después de mandarla: el usuario ya la está leyendo
+    if auditor.ACTIVO:
+        yield await auditar_turno(estado, pregunta, respuesta, mensaje_id, desde_cache,
+                                  cacheable=not turnos)
+
+
+async def auditar_turno(estado, pregunta: str, respuesta: RespuestaCitada, mensaje_id: int,
+                        desde_cache: bool, cacheable: bool) -> ServerSentEvent:
+    """Pide (o reusa) la auditoría de una respuesta, la guarda y arma el evento SSE.
+
+    Nunca lanza: si algo falla, la respuesta ya se mandó y solo se avisa que no hubo auditoría."""
+    try:
+        # Respuesta repetida desde la caché: su auditoría también está guardada, no se paga otra
+        guardada = await cache.leer_auditoria(estado.redis, pregunta) if desde_cache else None
+        if guardada:
+            auditoria = guardada.model_copy(update={
+                "tokens_entrada": 0, "tokens_salida": 0, "costo_usd": 0.0, "segundos": 0.0})
+        else:
+            if await cache.contar_auditoria_del_dia(estado.redis) > LIMITE_AUDITORIAS_DIA:
+                return ServerSentEvent(event="auditoria_omitida", data={
+                    "mensaje_id": mensaje_id, "motivo": "Se alcanzó el límite diario de auditorías."})
+            # Respuestas viejas en caché no traen "recuperados": se audita contra lo que citaron
+            ids = respuesta.recuperados or [c.id for c in respuesta.citas]
+            fragmentos = (await asyncio.to_thread(traer_fragmentos, estado.opensearch, ids)
+                          if ids else [])
+            auditoria = await auditor.auditar(pregunta, respuesta, fragmentos)
+            if cacheable and respuesta.error is None:
+                await cache.guardar_auditoria(estado.redis, pregunta, auditoria)
+        await bd.guardar_auditoria(estado.grupo, mensaje_id, auditoria, desde_cache=bool(guardada))
+        return ServerSentEvent(event="auditoria", data={
+            **auditoria.model_dump(), "mensaje_id": mensaje_id, "desde_cache": bool(guardada)})
+    except auditor.AuditoriaFallida as error:
+        registro.warning("No se pudo auditar el mensaje %s: %s", mensaje_id, error)
+    except Exception:
+        registro.exception("Falló la auditoría del mensaje %s", mensaje_id)
+    return ServerSentEvent(event="auditoria_error", data={
+        "mensaje_id": mensaje_id, "mensaje": "No se pudo auditar esta respuesta."})
 
 
 @app.get("/api/conversaciones")
@@ -217,7 +262,9 @@ async def salud(request: Request) -> dict:
             revisar("vllm", http.get(URL_EMBED.replace("/v2/embed", "/health"))),
             revisar("ollama", http.get(URL_OLLAMA.removesuffix("/v1") + "/api/version")),
         )
-    return {"ok": all(v == "ok" for v in revisiones.values()), "servicios": revisiones}
+    return {"ok": all(v == "ok" for v in revisiones.values()), "servicios": revisiones,
+            # El auditor es opcional: no cuenta para "ok" (sin llave, el chat funciona igual)
+            "auditor": auditor.MODELO_AUDITOR if auditor.ACTIVO else None}
 
 
 # --- Panel /admin ---

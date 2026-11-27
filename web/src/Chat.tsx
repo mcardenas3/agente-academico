@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   cargarConversacion, cargarFragmentos, listarConversaciones, ocultarConversacion, preguntar,
-  type Cita, type ConversacionResumen, type Fragmento, type Respuesta,
+  type Auditoria, type Cita, type ConversacionResumen, type Fragmento, type Respuesta,
 } from './api'
 import { paginas, numero, tiempo, ultimaSeccion } from './formato'
 import Historial from './Historial'
 import {
-  ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, List, MagnifyingGlass, NotePencil, Quotes, Warning,
+  ArrowClockwise, ArrowSquareOut, ArrowUp, CaretDown, Check, Lightning, List, MagnifyingGlass, NotePencil, Quotes,
+  ShieldCheck, ShieldWarning, Warning,
 } from './iconos'
+
+// La auditoría de Claude: 'pendiente' mientras llega, null si no se pudo, undefined si nunca se pidió
+type EstadoAuditoria = Auditoria | 'pendiente' | null | undefined
 
 type Mensaje =
   | { rol: 'usuario'; texto: string }
-  | { rol: 'agente'; texto: string; citas: Cita[]; meta?: Respuesta }
+  | { rol: 'agente'; id?: number; texto: string; citas: Cita[]; meta?: Respuesta; auditoria?: EstadoAuditoria }
   | { rol: 'pensando'; busqueda: string | null }
   | { rol: 'error'; texto: string; pregunta: string }
 
@@ -40,6 +44,9 @@ export default function Chat() {
   const [historialAbierto, setHistorialAbierto] = useState(false)  // solo cuenta en celular
   const final = useRef<HTMLDivElement>(null)
   const entrada = useRef<HTMLTextAreaElement>(null)
+  // Número de la pregunta en curso: la auditoría llega después de la respuesta y para entonces
+  // ya se puede haber mandado otra; así una petición vieja no desbloquea a la nueva
+  const peticion = useRef(0)
 
   const refrescarHistorial = useCallback(() => { listarConversaciones().then(setHistorial) }, [])
 
@@ -48,7 +55,7 @@ export default function Chat() {
     const guardados = await cargarConversacion(id)
     setMensajes(guardados.map((m) => (m.rol === 'usuario'
       ? { rol: 'usuario', texto: m.contenido }
-      : { rol: 'agente', texto: m.contenido, citas: m.citas })))
+      : { rol: 'agente', id: m.id, texto: m.contenido, citas: m.citas, auditoria: m.auditoria ?? undefined })))
   }
 
   // Al abrir, se recupera la última conversación (si la hay) y el historial
@@ -68,17 +75,30 @@ export default function Chat() {
     if (!pregunta || ocupado) return
     setTexto('')
     setOcupado(true)
+    const mia = ++peticion.current
+    let liberada = false
+    // Se desbloquea la caja al llegar la respuesta, sin esperar la auditoría
+    const liberar = () => {
+      if (liberada || peticion.current !== mia) return
+      liberada = true
+      setOcupado(false)
+      refrescarHistorial()  // la conversación aparece (o sube) en el historial
+      entrada.current?.focus()
+    }
     setMensajes((ms) => [...ms.filter((m) => m.rol !== 'error'), { rol: 'usuario', texto: pregunta },
       { rol: 'pensando', busqueda: null }])
     await preguntar(pregunta, conversacion, {
       conversacion: (id) => { setConversacion(id); guardarConversacion(id) },
       buscando: (consulta) => reemplazarUltimo({ rol: 'pensando', busqueda: consulta }),
-      respuesta: (r) => reemplazarUltimo({ rol: 'agente', texto: r.respuesta, citas: r.citas, meta: r }),
+      respuesta: (r) => {
+        reemplazarUltimo({ rol: 'agente', id: r.mensaje_id, texto: r.respuesta, citas: r.citas, meta: r,
+          auditoria: r.auditando ? 'pendiente' : undefined })
+        liberar()
+      },
       error: (mensaje) => reemplazarUltimo({ rol: 'error', texto: mensaje, pregunta }),
+      auditoria: (id, a) => setMensajes((ms) => ms.map((m) => (m.rol === 'agente' && m.id === id ? { ...m, auditoria: a } : m))),
     })
-    setOcupado(false)
-    refrescarHistorial()  // la conversación aparece (o sube) en el historial
-    entrada.current?.focus()
+    liberar()  // por si terminó en error (sin respuesta)
   }
 
   async function abrirConversacion(id: string) {
@@ -260,6 +280,76 @@ function Burbuja({ m, onReintentar }: { m: Mensaje; onReintentar: (p: string) =>
           ) : (
             <span>{tiempo(m.meta.segundos)} · {numero(m.meta.tokens_entrada)} → {numero(m.meta.tokens_salida)} tokens</span>
           )}
+        </div>
+      )}
+      {m.auditoria !== undefined && <Auditado estado={m.auditoria} />}
+    </div>
+  )
+}
+
+const VEREDICTOS = {
+  aprobada: { texto: 'Aprobada', tono: 'ok' },
+  con_observaciones: { texto: 'Con observaciones', tono: 'warn' },
+  reprobada: { texto: 'Reprobada', tono: 'bad' },
+} as const
+
+const FIDELIDAD = { fiel: 'Fiel', parcialmente_fiel: 'Parcialmente fiel', no_fiel: 'No fiel' } as const
+
+/** Lo que dijo Claude al revisar la respuesta contra los fragmentos. Se despliega al tocarlo. */
+function Auditado({ estado }: { estado: Auditoria | 'pendiente' | null }) {
+  const [abierto, setAbierto] = useState(false)
+
+  if (estado === 'pendiente') {
+    return (
+      <div className="text-micro text-ink-muted" aria-live="polite">
+        <Paso activo icono={<ShieldCheck size={13} weight="bold" />}>Claude está auditando la respuesta</Paso>
+      </div>
+    )
+  }
+  if (estado === null) {
+    return (
+      <p className="inline-flex items-center gap-1.5 text-micro text-ink-faint">
+        <ShieldWarning size={13} weight="bold" /> No se pudo auditar esta respuesta
+      </p>
+    )
+  }
+
+  const v = VEREDICTOS[estado.veredicto]
+  const Icono = estado.veredicto === 'aprobada' ? ShieldCheck : ShieldWarning
+  return (
+    <div>
+      <button onClick={() => setAbierto((a) => !a)} aria-expanded={abierto}
+        className="inline-flex items-center gap-1.5 text-micro font-semibold text-ink-muted hover:text-ink">
+        <span className="chip" data-tone={v.tono}><Icono size={12} weight="bold" /> {v.texto}</span>
+        Auditada por Claude
+        <CaretDown size={11} weight="bold" className={`transition-transform ${abierto ? 'rotate-180' : ''}`} />
+      </button>
+      {abierto && (
+        <div className="mt-2 flex flex-col gap-2 rounded-[10px] border border-line-subtle bg-raised px-3 py-2.5 text-meta text-ink">
+          <p className="m-0">{estado.resumen}</p>
+          <div className="flex flex-wrap gap-1.5 text-micro">
+            <span className="chip" data-tone={estado.fidelidad === 'fiel' ? 'ok' : estado.fidelidad === 'no_fiel' ? 'bad' : 'warn'}>
+              {FIDELIDAD[estado.fidelidad]}
+            </span>
+            <span className="chip" data-tone={estado.relevancia >= 4 ? 'ok' : estado.relevancia >= 3 ? 'warn' : 'bad'}>
+              Relevancia {estado.relevancia}/5
+            </span>
+            <span className="chip" data-tone={estado.citas_correctas ? 'ok' : 'bad'}>
+              {estado.citas_correctas ? 'Citas correctas' : 'Citas incorrectas'}
+            </span>
+            <span className="chip" data-tone={estado.abstencion_correcta ? 'ok' : 'bad'}>
+              {estado.abstencion_correcta ? 'Acertó en responder o abstenerse' : 'No acertó en responder o abstenerse'}
+            </span>
+          </div>
+          {estado.problemas.length > 0 && (
+            <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-ink-muted">
+              {estado.problemas.map((p) => <li key={p}>{p}</li>)}
+            </ul>
+          )}
+          <p className="m-0 text-micro text-ink-faint">
+            Revisión hecha con {estado.modelo} contra los fragmentos que recuperó la búsqueda
+            {estado.desde_cache ? ' · reusada de la caché' : ''}
+          </p>
         </div>
       )}
     </div>

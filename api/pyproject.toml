@@ -9,6 +9,8 @@ version = "0.1.0"
 requires-python = "==3.13.*"
 # Librerías que necesita el proyecto; se agregan con "uv add"
 dependencies = [
+    # SDK de la API de Claude: el auditor que revisa cada respuesta
+    "anthropic>=2.14.0",
     # El servidor web: rutas /api/chat, /api/admin y la interfaz de React ya compilada
     "fastapi>=0.165.0",
     # Cliente HTTP para pedir a vLLM el vector de la pregunta
