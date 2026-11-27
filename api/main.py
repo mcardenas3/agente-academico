@@ -60,7 +60,7 @@ CARPETA_WEB = Path(os.environ.get("CARPETA_WEB", Path(__file__).resolve().parent
 ARCHIVO_PDF = Path(os.environ.get(
     "ARCHIVO_PDF", Path(__file__).resolve().parent.parent / "datos" / "huang2026-rag-survey.pdf"))
 # Tope de auditorías nuevas por día, para que el saldo de la API de Claude no se acabe si la
-# página pública recibe muchas preguntas (200 × ~US$0.0006 ≈ US$0.12 al día con Haiku)
+# página pública recibe muchas preguntas (200 × ~US$0.0007 ≈ US$0.14 al día con Haiku)
 LIMITE_AUDITORIAS_DIA = int(os.environ.get("LIMITE_AUDITORIAS_DIA", "200"))
 
 

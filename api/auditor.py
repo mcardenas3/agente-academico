@@ -18,8 +18,9 @@ from pydantic import BaseModel, Field
 from agente import RespuestaCitada
 from busqueda import Fragmento
 
-# Haiku por defecto: cuesta ~US$0.001 por auditoría (Opus 5.5 cuesta ~40 veces más). Se cambia
-# con MODELO_AUDITOR, p. ej. claude-sonnet-5-5 o claude-opus-5-5
+# Haiku por defecto: en evaluacion/comparar_auditores.py detectó los mismos errores que Sonnet
+# (33/33) por 1/18 del costo (~US$0.0007 por auditoría). Se cambia con MODELO_AUDITOR, p. ej.
+# claude-sonnet-5-5, que encuentra matices más finos
 MODELO_AUDITOR = os.environ.get("MODELO_AUDITOR", "claude-haiku-5-5")
 _LLAVE = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY") or ""
 ACTIVO = bool(_LLAVE)
@@ -132,15 +133,15 @@ def armar_mensaje(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fr
     return "\n\n".join(partes)
 
 
-async def auditar(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fragmento]
-                  ) -> Auditoria:
+async def auditar(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fragmento],
+                  modelo: str = MODELO_AUDITOR) -> Auditoria:
     """Pide a Claude el veredicto de una respuesta. Lanza AuditoriaFallida si no se pudo."""
     if not ACTIVO:
         raise AuditoriaFallida("Falta la llave de la API de Claude en .env")
     inicio = time.perf_counter()
     try:
         r = await _cliente_api().messages.parse(
-            model=MODELO_AUDITOR,
+            model=modelo,
             # Incluye lo que Claude piensa antes de contestar; el veredicto en sí son ~300 tokens
             max_tokens=8000,
             # Esfuerzo explícito: "medium" basta para comparar una respuesta con 5 fragmentos
@@ -161,9 +162,9 @@ async def auditar(pregunta: str, respuesta: RespuestaCitada, fragmentos: list[Fr
         raise AuditoriaFallida(f"La auditoría no terminó (stop_reason={r.stop_reason})")
     return Auditoria(
         **r.parsed_output.model_dump(),
-        modelo=MODELO_AUDITOR,
+        modelo=modelo,
         tokens_entrada=r.usage.input_tokens,
         tokens_salida=r.usage.output_tokens,
-        costo_usd=costo(MODELO_AUDITOR, r.usage.input_tokens, r.usage.output_tokens),
+        costo_usd=costo(modelo, r.usage.input_tokens, r.usage.output_tokens),
         segundos=round(time.perf_counter() - inicio, 2),
     )

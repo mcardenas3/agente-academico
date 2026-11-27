@@ -1,0 +1,1423 @@
+{
+  "resumen": [
+    {
+      "modelo": "claude-haiku-5-5",
+      "detecta respuesta de otra pregunta": "4/4",
+      "detecta dato inventado": "4/4",
+      "detecta abstención fallida": "2/2",
+      "no da falsa alarma de abstención": "23/23",
+      "aciertos totales": "33/33",
+      "reales aprobadas": "18/25",
+      "reales fieles": "21/25",
+      "costo total (US$)": 0.0237,
+      "costo por auditoría (US$)": 0.00072,
+      "segundos por auditoría": 3.01,
+      "tokens de salida por auditoría": 497
+    },
+    {
+      "modelo": "claude-sonnet-5-5",
+      "detecta respuesta de otra pregunta": "4/4",
+      "detecta dato inventado": "4/4",
+      "detecta abstención fallida": "2/2",
+      "no da falsa alarma de abstención": "23/23",
+      "aciertos totales": "33/33",
+      "reales aprobadas": "16/25",
+      "reales fieles": "18/25",
+      "costo total (US$)": 0.435,
+      "costo por auditoría (US$)": 0.01318,
+      "segundos por auditoría": 3.47,
+      "tokens de salida por auditoría": 380
+    }
+  ],
+  "mismo_veredicto_reales": "22/25",
+  "casos": [
+    {
+      "caso": "real 1",
+      "tipo": "real",
+      "pregunta": "¿Por qué alucinan los modelos de lenguaje y cómo ayuda RAG?",
+      "respuesta": "Los modelos de lenguaje alucinan principalmente porque no pueden acceder a información actualizada fuera de sus datos de entrenamiento. RAG ayuda a resolver este problema al complementar el conocimiento interno del modelo con información actualizada de fuentes externas mediante un modelo de recuperación, lo que permite generar respuestas más precisas y actuales.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que las alucinaciones se deben principalmente a la imposibilidad de acceder a información actualizada, por depender de los datos de entrenamiento, y que RAG complementa el conocimiento interno con información externa vía un modelo de recuperación. Ambas ideas aparecen casi literalmente en el fragmento huang2026-rag-survey-005 (citado), que además respalda la mejora de precisión. El fragmento 003 también menciona las alucinaciones como una de tres causas, lo que la respuesta reduce a una sola causa principal; esto es una simplificación, pero el fragmento 005 sí dice que la alucinación 'se atribuye en gran medida' a esa limitación. Las citas sostienen la respuesta.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La respuesta presenta la falta de información actualizada como causa principal, mientras que el fragmento 003 enumera tres causas (conocimiento generalista, desactualización y alucinaciones); la omisión de las otras dos no es un error, pero deja incompleta la explicación del porqué."
+        ],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos citados y responde el núcleo de la pregunta, aunque simplifica las causas de las alucinaciones.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5507,
+        "tokens_salida": 481,
+        "costo_usd": 0.000791,
+        "segundos": 3.64
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que la alucinación se debe sobre todo a la imposibilidad de acceder a información actualizada fuera del entrenamiento, y que RAG la complementa con fuentes externas mediante un modelo de recuperación. Ambas ideas aparecen casi textualmente en los fragmentos 005 y 003, que además están citados. Responde de forma directa a las dos partes de la pregunta (causa y ayuda de RAG).",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel al artículo, responde ambas partes de la pregunta y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5507,
+        "tokens_salida": 259,
+        "costo_usd": 0.013604,
+        "segundos": 2.48
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 2",
+      "tipo": "real",
+      "pregunta": "¿Cuáles son las fases del paradigma RAG?",
+      "respuesta": "Las fases del paradigma RAG son: pre-retrieval, retrieval, post-retrieval y generación.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que el paradigma RAG tiene cuatro fases: pre-retrieval, retrieval, post-retrieval y generación. El fragmento huang2026-rag-survey-010 dice explícitamente que el paradigma se estructura en esas cuatro fases (pre-retrieval, retrieval, post-retrieval y generation), por lo que la afirmación está completamente respaldada. La respuesta es breve, directa y responde exactamente la pregunta; la cita marcada como citada='sí' sostiene la respuesta.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta enumera correctamente las cuatro fases del paradigma RAG según el artículo, con respaldo directo en los fragmentos citados.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 3934,
+        "tokens_salida": 312,
+        "costo_usd": 0.000549,
+        "segundos": 2.65
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta enumera cuatro fases: pre-retrieval, retrieval, post-retrieval y generación. El fragmento 010 (citado) lo afirma textualmente, y el 004 lo confirma. Los fragmentos 012 y 014 corresponden a retrieval y generación. No se añade nada que no esté en los fragmentos.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente a la pregunta y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 3934,
+        "tokens_salida": 226,
+        "costo_usd": 0.010128,
+        "segundos": 3.14
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 3",
+      "tipo": "real",
+      "pregunta": "¿En qué se diferencian BM25 y los recuperadores basados en modelos de lenguaje?",
+      "respuesta": "BM25 es un retriever tradicional que se basa en coincidencias de palabras y es rápido y eficiente, ideal para dominios con terminología estandarizada. Los recuperadores basados en modelos de lenguaje, como los densos o aprendidos, capturan la semántica de las consultas y pueden encontrar documentos relevantes incluso sin coincidencias de palabras exactas, lo que mejora la precisión en consultas abiertas. La elección depende de la necesidad de velocidad y simplicidad (BM25) versus la comprensión semántica (modelos de lenguaje).",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que BM25 se basa en coincidencia de palabras, es rápido y eficiente y sirve bien en dominios con terminología estandarizada; los fragmentos 049 y 050 lo respaldan. Afirma también que los recuperadores neuronales (densos y aprendidos) capturan semántica y encuentran documentos sin coincidencia exacta de palabras, lo que mejora la calidad en consultas abiertas, respaldado por los fragmentos 049 y 008. La conclusión sobre elegir según velocidad frente a semántica aparece en el fragmento 050. Todas las afirmaciones tienen respaldo en los fragmentos recuperados.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente la comparación entre BM25 y los recuperadores basados en modelos de lenguaje, y sus citas sostienen lo afirmado.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4422,
+        "tokens_salida": 374,
+        "costo_usd": 0.000629,
+        "segundos": 2.77
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta contrasta BM25 (coincidencia léxica, rápido, eficiente, útil con terminología estandarizada) con los modelos neurales (semántica, documentos relevantes sin solapamiento de palabras, mejor en consultas abiertas) y el tradeoff de elección. Todo esto aparece en los fragmentos 049, 008 y 050, que además son los citados. Asimila 'basados en modelos de lenguaje' con 'densos o aprendidos', una equiparación razonable con el texto.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente a la pregunta y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4422,
+        "tokens_salida": 285,
+        "costo_usd": 0.011694,
+        "segundos": 3.42
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 4",
+      "tipo": "real",
+      "pregunta": "¿Cómo funciona el hashing sensible a la localidad para buscar vecinos cercanos?",
+      "respuesta": "El hashing sensible a la localidad (LSH) funciona mapeando vectores similares a valores hash cercanos o iguales, de modo que los vecinos cercanos se agrupan en el mismo bucket. Esto permite recuperar rápidamente candidatos que comparten el mismo hash, reduciendo la complejidad del problema y acelerando la búsqueda, aunque puede introducir pequeñas inexactitudes.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que LSH mapea vectores similares a los mismos o cercanos valores hash, agrupando vecinos en un mismo bucket, que permite recuperar candidatos rápidamente, reduce la dimensionalidad y puede introducir inexactitudes. Todas estas ideas aparecen en el fragmento huang2026-rag-survey-017, que además está citado. La respuesta no menciona la poca frecuencia de uso en RAG, pero eso no es una afirmación falsa ni necesaria para responder la pregunta.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta sobre LSH es fiel a los fragmentos, responde directamente la pregunta y está respaldada por una cita correcta.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4043,
+        "tokens_salida": 310,
+        "costo_usd": 0.000559,
+        "segundos": 3.21
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta dice que LSH mapea vectores similares a hashes iguales o cercanos, que agrupa vecinos en el mismo bucket, que recupera candidatos con el mismo hash rápidamente y que puede introducir inexactitudes. Todo aparece en el fragmento 017, el único citado. Decir 'reduciendo la complejidad' es una paráfrasis razonable de 'reduce la dimensionalidad del problema'.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta explica fielmente cómo funciona LSH según el artículo y está bien respaldada por el fragmento citado.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4043,
+        "tokens_salida": 267,
+        "costo_usd": 0.010756,
+        "segundos": 2.66
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 5",
+      "tipo": "real",
+      "pregunta": "¿Qué estrategias existen para modificar la consulta del usuario?",
+      "respuesta": "Existen tres estrategias principales para modificar la consulta del usuario: expansión de consulta, reformulación de consulta y reescritura basada en prompts. La expansión agrega términos relacionados para ampliar el alcance, la reformulación mejora la claridad y precisión, y la reescritura basada en prompts utiliza instrucciones para guiar la comprensión del modelo. Además, hay estrategias adaptativas que ajustan dinámicamente la estrategia de recuperación según el contexto.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que hay tres estrategias de manipulación de consulta (expansión, reformulación y reescritura basada en prompts), con una descripción correcta de cada una según los fragmentos 020, 021 y 022. Añade que existen estrategias adaptativas que ajustan la recuperación, lo cual aparece en el fragmento 028, pero ese fragmento no trata de modificar la consulta como tal y fue citado con citado=no, por lo que esa afirmación secundaria no está respaldada como parte de la manipulación de consulta. Las citas recuperadas (020, 021, 022) sostienen el núcleo de la respuesta.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La mención de estrategias adaptativas que ajustan la recuperación proviene del fragmento 028 (sección de estrategia de recuperación), no de la manipulación de la consulta, y ese fragmento no fue citado."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta describe correctamente las tres estrategias de manipulación de consulta, pero añade una afirmación sobre estrategias adaptativas que no pertenece a ese tema y no está citada.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4860,
+        "tokens_salida": 447,
+        "costo_usd": 0.000709,
+        "segundos": 2.62
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "Las tres estrategias (expansión, reformulación, reescritura basada en prompts) y sus descripciones están respaldadas por los fragmentos 020-022. La última frase sobre estrategias adaptativas viene del fragmento 028, que habla de estrategias de recuperación y no de modificar la consulta, por lo que se presenta como estrategia de modificación algo que no lo es; además ese fragmento no fue citado. La respuesta cubre bien lo preguntado.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": false,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La frase sobre estrategias adaptativas mezcla la estrategia de recuperación (sección 4.3) con la manipulación de la consulta (4.1), lo que desvía del tema preguntado.",
+          "La afirmación sobre estrategias adaptativas se apoya en el fragmento 028, que no está entre las citas mostradas.",
+          "Se omiten ejemplos o detalles de los fragmentos como Query2doc, RQ-RAG o Step-Back, aunque no son indispensables."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta enumera correctamente las tres estrategias de manipulación de consulta, pero añade una afirmación sobre recuperación adaptativa que no corresponde a la pregunta y no está citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4860,
+        "tokens_salida": 474,
+        "costo_usd": 0.01446,
+        "segundos": 4.14
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 6",
+      "tipo": "real",
+      "pregunta": "¿Qué es la reformulación de consultas y qué métodos la usan?",
+      "respuesta": "La reformulación de consultas es un proceso que modifica la consulta original para hacerla más clara y precisa, ayudando al sistema de recuperación a entender mejor la intención del usuario. Se utilizan varios métodos: uno de una sola vez, como RQ-RAG [14], que reescribe y simplifica la consulta antes de la recuperación; y otro iterativo, como Rewrite-Retrieve-Read [109] o FLARE [73], que mejora la consulta durante el proceso de recuperación y generación. También hay estrategias basadas en prompts, como Step-Back [189] o CoK [96], que guían la comprensión de la consulta mediante instrucciones. Además, se pueden combinar con expansión de consultas o normalización. La elección depende de si se busca eficiencia o adaptabilidad.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta define la reformulación como modificar la consulta para hacerla más clara y precisa, lo que respalda el fragmento 021. Menciona RQ-RAG como método de una sola pasada y Rewrite-Retrieve-Read y FLARE como iterativos, también presentes en 021, y la diferencia de eficiencia frente a adaptabilidad sale del mismo fragmento. Step-Back y CoK aparecen en 022, pero allí se clasifican como reescritura basada en prompts, no como reformulación. La afirmación de que se pueden combinar con expansión o normalización es una extrapolación leve de 022 y 012.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Step-Back y CoK se presentan como métodos de reformulación, aunque los fragmentos los clasifican como reescritura basada en prompts, una estrategia distinta.",
+          "La idea de que la reformulación 'se puede combinar' con expansión o normalización no aparece explícita en los fragmentos; 022 solo dice que suelen aplicarse por separado."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta es fiel a los fragmentos y responde directamente, aunque mezcla la reescritura por prompts con la reformulación y añade una afirmación sobre combinar estrategias que no está respaldada.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4567,
+        "tokens_salida": 1301,
+        "costo_usd": 0.001107,
+        "segundos": 6.41
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La definición de reformulación y los ejemplos de RQ-RAG (una sola vez) y Rewrite-Retrieve-Read y FLARE (iterativos) salen del fragmento 021, así como el contraste eficiencia/adaptabilidad. Pero la respuesta dice que RQ-RAG 'simplifica' la consulta, cuando el texto dice reescribe, descompone y aclara. Además mete Step-Back y CoK como métodos de reformulación, aunque el fragmento 022 los presenta como reescritura basada en prompts, distinta de la reformulación. La mención a combinar con expansión o normalización no está respaldada: la normalización solo aparece como otra técnica de manipulación, no como combinable.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Presenta Step-Back y CoK como métodos de reformulación, cuando el artículo los clasifica como reescritura basada en prompts, distinta de la reformulación.",
+          "Dice que RQ-RAG 'simplifica' la consulta; el texto habla de reescribir, descomponer y aclarar.",
+          "Afirma que la reformulación se puede combinar con expansión o normalización, algo que los fragmentos no sostienen (solo UniRAG elige entre estrategias).",
+          "La frase final sobre eficiencia o adaptabilidad es correcta, pero se aplica a un conjunto de métodos más amplio de lo que dice el artículo."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La definición y los métodos principales son correctos, pero la respuesta mezcla la reescritura basada en prompts con la reformulación y añade una combinación con expansión o normalización que los fragmentos no respaldan.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4567,
+        "tokens_salida": 616,
+        "costo_usd": 0.015294,
+        "segundos": 5.12
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 7",
+      "tipo": "real",
+      "pregunta": "¿Qué diferencia hay entre la recuperación iterativa y la recursiva?",
+      "respuesta": "La recuperación iterativa y la recursiva son dos estrategias de recuperación en RAG. La iterativa utiliza un bucle entre recuperación y generación para refinar la consulta y el contexto en múltiples pasos, lo que permite razonamiento multi-entrada. La recursiva, en cambio, organiza el conocimiento en una estructura jerárquica o gráfica y navega desde información general a detalles específicos, sin necesidad de un bucle explícito. Ambas permiten un contexto más profundo, pero la iterativa es secuencial y adaptativa, mientras que la recursiva es estructurada y basada en jerarquías.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que la iterativa usa un bucle entre recuperación y generación para refinar la consulta, lo cual está respaldado por el fragmento 026, y que la recursiva navega una estructura jerárquica o gráfica de general a específico, respaldado por el fragmento 027. Sin embargo, 'razonamiento multi-entrada' no aparece en los fragmentos (son razonamiento multi-paso o multi-salto), y la frase 'sin necesidad de un bucle explícito' es una inferencia no literal, aunque coherente con el texto. La comparación final de 'sequencial y adaptativa' para la iterativa contradice parcialmente que el texto la describe como estrategia de bucle, no adaptativa (la adaptativa es otra estrategia distinta).",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": false,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La respuesta describe la iterativa como 'adaptativa', pero en los fragmentos la adaptativa es una estrategia distinta, con el LLM decidiendo dinámicamente cuándo y qué recuperar.",
+          "'Razonamiento multi-entrada' no aparece en los fragmentos; estos hablan de razonamiento multi-paso o multi-salto.",
+          "No se citó ningún fragmento, aunque los fragmentos citados (026 y 027) respaldan la respuesta; el texto de la respuesta no lo menciona pero las citas no se muestran."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta distingue correctamente el bucle iterativo de la navegación jerárquica recursiva, pero introduce una caracterización errónea de la iterativa como adaptativa y un término no respaldado.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5492,
+        "tokens_salida": 615,
+        "costo_usd": 0.000857,
+        "segundos": 3.59
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta distingue bien ambas estrategias: la iterativa usa un bucle recuperación-generación que refina consulta y contexto (fragmento 026), y la recursiva navega una estructura jerárquica o de grafo de lo general a lo específico (fragmento 027). Hay detalles dudosos: \"razonamiento multi-entrada\" es una expresión imprecisa (el texto dice multi-hop/multi-paso), \"sin necesidad de un bucle explícito\" no aparece en los fragmentos, y calificar la iterativa de \"adaptativa\" choca con la sección que separa la estrategia adaptativa de la iterativa. Omite que en la recursiva la consulta puede permanecer igual y solo se reduce el espacio de búsqueda.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "\"Sin necesidad de un bucle explícito\" no está respaldado por los fragmentos; solo se dice que la recursiva no es un proceso lineal como la iterativa.",
+          "\"Razonamiento multi-entrada\" es una traducción imprecisa de multi-hop o multi-paso.",
+          "Llamar \"adaptativa\" a la iterativa es confuso, pues el artículo trata la estrategia adaptativa como distinta de la iterativa.",
+          "No menciona la diferencia clave de que en la recursiva se estrecha el espacio de búsqueda sin necesariamente reescribir la consulta."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta capta la diferencia principal entre ambas estrategias, pero añade afirmaciones no respaldadas y usa términos imprecisos.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5492,
+        "tokens_salida": 601,
+        "costo_usd": 0.016994,
+        "segundos": 4.69
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 8",
+      "tipo": "real",
+      "pregunta": "En la recuperación adaptativa, ¿cómo decide el modelo cuándo recuperar más información?",
+      "respuesta": "El modelo decide cuándo recuperar más información mediante una estrategia adaptativa que monitorea la confianza en la generación. Si la confianza es baja, activa la recuperación adicional para obtener más contexto. Si la confianza es alta, detiene la recuperación. Esta estrategia se implementa en el algoritmo 4 de la revisión.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que el modelo adapta la recuperación monitoreando su confianza: recupera más si la confianza es baja y se detiene si es alta, y lo ubica en el algoritmo 4. El fragmento 028 respalda que, con baja confianza, el modelo busca más información (FLARE monitorea la probabilidad de los tokens), y el algoritmo 4 aparece citado. Sin embargo, los fragmentos no dicen que se detenga con confianza alta; el algoritmo para (BREAK) cuando el feedback es positivo, no por confianza explícita.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La condición de detenerse cuando la confianza es alta no aparece en los fragmentos; el algoritmo 4 se detiene con un feedback positivo, no con confianza explícita.",
+          "Atribuye al algoritmo 4 el monitoreo de confianza, cuando el algoritmo usa funciones de feedback genéricas; el mecanismo concreto (FLARE, probabilidad de tokens) no se menciona."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta acierta en la idea central (recuperar más cuando baja la confianza), pero añade la parte de detenerse con confianza alta que los fragmentos no respaldan explícitamente.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5684,
+        "tokens_salida": 1155,
+        "costo_usd": 0.001146,
+        "segundos": 5.52
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que el modelo adaptativo monitorea su confianza y recupera más si es baja; esto aparece en los fragmentos 028 (FLARE, baja confianza) y 023. Sin embargo, reduce el mecanismo solo a la confianza, omitiendo Self-RAG (tokens especiales de reflexión) y CoK. La afirmación 'si la confianza es alta, detiene la recuperación' no aparece explícita; en el Algoritmo 4 la parada depende de una función de retroalimentación sobre la salida, no de la confianza. Mencionar el algoritmo 4 sí está respaldado.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 3,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que con confianza alta se detiene la recuperación, cosa que los fragmentos no dicen.",
+          "Presenta la confianza como el único criterio, omitiendo Self-RAG (tokens especiales de reflexión) y CoK (ajuste según necesidades de la tarea).",
+          "Atribuye al algoritmo 4 un monitoreo de confianza, cuando este usa una función de retroalimentación sobre la salida para decidir si ajusta o detiene el proceso.",
+          "No menciona que la recuperación adaptativa también puede cambiar el método de búsqueda o ampliar la consulta."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta es correcta en lo central (baja confianza dispara la recuperación, como en FLARE), pero es incompleta y añade detalles no respaldados por el artículo.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5684,
+        "tokens_salida": 559,
+        "costo_usd": 0.016958,
+        "segundos": 4.63
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 9",
+      "tipo": "real",
+      "pregunta": "¿Cómo funcionan los modelos supervisados de reordenamiento?",
+      "respuesta": "Los modelos supervisados de reordenamiento se entrenan con conjuntos de datos que incluyen etiquetas de relevancia explícitas. Utilizan modelos como BERT como cross-encoders para calcular puntuaciones de relevancia, o modelos encoder-decoder como T5 que generan tokens como \"true\" o \"false\" para indicar relevancia. También emplean mecanismos auto-regresivos, como en FiD-Light y GenRT, para generar listas ordenadas de documentos. Además, se utilizan técnicas basadas en prompts, como RankLLaMA, que se enfocan en la representación del último token generado. Estos modelos suelen ser más precisos en dominios específicos, aunque son costosos computacionalmente. Para mejorar su rendimiento, se emplean técnicas de distilación de conocimiento y datos sintéticos generados mediante LLMs.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que los re-rankers supervisados se entrenan con etiquetas explícitas, usan BERT como cross-encoder (costoso computacionalmente), T5 generando 'true'/'false', FiD-Light y GenRT con generación auto-regresiva de listas, RankLLaMA con el último token, y mejoras por destilación y datos sintéticos. Todas estas ideas aparecen en el fragmento 034 y en el 035 (datos aumentados), por lo que la respuesta está respaldada. Sin embargo, el fragmento 034 indica que la destilación es un patrón de uso del re-ranker para entrenar el retriever (ITER-RETGEN), y los datos sintéticos vienen del fragmento 035; la respuesta los presenta como técnicas para mejorar los re-rankers, lo cual es una simplificación pero no una contradicción grave. Las citas 034 y 035 sostienen el contenido principal, aunque el fragmento 033 (citado) y el 072 y 020 (no citados) no aportan a la respuesta.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La destilación de conocimiento se describe en el fragmento como entrenamiento del retriever a partir de un re-ranker, no como mejora del propio re-ranker supervisado.",
+          "El fragmento 033 está citado pero no sostiene ninguna afirmación específica de la respuesta sobre modelos supervisados."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta está respaldada por los fragmentos, con una simplificación en cómo se presenta la destilación de conocimiento.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5042,
+        "tokens_salida": 586,
+        "costo_usd": 0.000797,
+        "segundos": 3.14
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta resume casi todo el fragmento 034: fine-tuning con etiquetas de relevancia, BERT como cross-encoder, T5 con tokens true/false, FiD-Light y GenRT, RankLLaMA y mayor precisión en dominios específicos. Dos puntos son imprecisos. Dice que son costosos computacionalmente en general, cuando el fragmento lo atribuye solo al método cross-encoder. Presenta la distilación de conocimiento como técnica para mejorar su rendimiento, cuando el fragmento la describe como uso de un re-ranker potente para mejorar el retriever (ITER-RETGEN). Los datos sintéticos con LLM sí aparecen en el fragmento 035.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Generaliza que los re-rankers supervisados son costosos computacionalmente; el fragmento lo dice solo del enfoque cross-encoder con BERT.",
+          "Afirma que la distilación de conocimiento mejora el rendimiento de estos modelos, pero el fragmento dice que un re-ranker fuerte se usa para entrenar y mejorar el retriever, no al revés.",
+          "Dice que FiD-Light y GenRT 'generan listas ordenadas' con mecanismos auto-regresivos; eso es exacto para FiD-Light, pero GenRT se describe como encoder-decoder que reordena secuencialmente."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta es relevante y está bien citada, pero generaliza el costo computacional y malinterpreta el papel de la distilación de conocimiento, por lo que tiene observaciones.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5042,
+        "tokens_salida": 607,
+        "costo_usd": 0.016154,
+        "segundos": 4.74
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 10",
+      "tipo": "real",
+      "pregunta": "¿Para qué sirve filtrar los documentos recuperados?",
+      "respuesta": "Filtrar los documentos recuperados sirve para eliminar aquellos que no son relevantes o tienen baja calidad, reduciendo el tamaño del conjunto de documentos y mejorando la eficiencia y efectividad de los pasos posteriores en el sistema de generación asistida por recuperación (RAG).",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que filtrar sirve para eliminar documentos no relevantes o de baja calidad, reducir el tamaño del conjunto y mejorar la eficiencia y efectividad de los pasos siguientes. Todo esto aparece literalmente en el fragmento huang2026-rag-survey-036 (sección 5.2) y en el fragmento huang2026-rag-survey-013 (sección 2.2.3), ambos citados. La respuesta contestó y los fragmentos tenían la información, por lo que la decisión fue correcta.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos citados, responde directamente la pregunta y la decisión de contestar fue correcta.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4219,
+        "tokens_salida": 309,
+        "costo_usd": 0.000576,
+        "segundos": 1.9
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que el filtrado elimina documentos irrelevantes o de baja calidad, reduce el tamaño del conjunto y mejora la eficiencia y efectividad de los pasos posteriores. Todo esto aparece casi textualmente en el fragmento 036 y es coherente con el 013. Los fragmentos citados sostienen la respuesta y había información suficiente para contestar.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente la pregunta y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4219,
+        "tokens_salida": 244,
+        "costo_usd": 0.010878,
+        "segundos": 2.63
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 11",
+      "tipo": "real",
+      "pregunta": "¿Cómo se combinan varios documentos recuperados al generar la respuesta?",
+      "respuesta": "Se combinan varios documentos recuperados procesando todos los documentos juntos para formar una respuesta más completa, o tratando cada documento como una fuente independiente y combinando sus salidas, o integrando el conocimiento directamente en los parámetros del modelo.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma tres estrategias: procesar todos los documentos juntos (como FiD), tratar cada documento como fuente independiente y combinar sus salidas (como REPLUG), e integrar el conocimiento en los parámetros (P-RAG). Las tres aparecen en los fragmentos huang2026-rag-survey-039, que los describe con sus ejemplos. Los fragmentos citados sostienen la respuesta, aunque la respuesta no menciona los métodos concretos ni los matices sobre costo y escalabilidad.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel y responde directamente la pregunta sobre cómo combinar varios documentos recuperados, con sus tres estrategias respaldadas por los fragmentos citados.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4566,
+        "tokens_salida": 326,
+        "costo_usd": 0.00062,
+        "segundos": 1.97
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta resume las tres estrategias de ensamblado del fragmento 039: procesar todos los documentos juntos (FiD), tratar cada uno como fuente independiente y combinar salidas (REPLUG) e integrar conocimiento en los parámetros (P-RAG). Todo aparece en los fragmentos. Es correcta pero muy escueta: no nombra los métodos ni las ventajas y desventajas, y no menciona la concatenación con la consulta de forma explícita.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Respuesta muy general: omite ejemplos (FiD, REPLUG, P-RAG) y los compromisos de cada estrategia que los fragmentos sí detallan.",
+          "Presenta P-RAG como forma de combinar documentos sin aclarar que lo hace offline y fuera del contexto de entrada."
+        ],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos y está bien citada, aunque es breve y omite detalles que el artículo sí ofrece.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4566,
+        "tokens_salida": 392,
+        "costo_usd": 0.013052,
+        "segundos": 3.83
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 12",
+      "tipo": "real",
+      "pregunta": "¿Cómo se personalizan las respuestas para cada usuario?",
+      "respuesta": "Las respuestas se personalizan adaptando tanto el proceso de recuperación como la generación a las necesidades y contexto de cada usuario. Esto incluye el uso de estrategias como ROPG [136] para seleccionar estrategias de recuperación personalizadas, CFRAG [140] para aprovechar el historial de usuarios similares y PGraphRAG [7] para construir un grafo centrado en el usuario. Además, se emplean enfoques como PersonaRAG [185] para actualizar dinámicamente el entendimiento del usuario durante una sesión, y ERAGent [142] para integrar preferencias explícitas en la generación. Estas técnicas permiten respuestas más relevantes y adaptadas a cada usuario.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que la personalización adapta recuperación y generación al usuario, y menciona ROPG, CFRAG, PGraphRAG, PersonaRAG y ERAGent. Todas estas afirmaciones aparecen en los fragmentos 042 y 041 (sección 6.2), que están citados. La afirmación general sobre adaptar recuperación y generación también está respaldada por el fragmento 041 y el 014. No hay afirmaciones que no salgan de los fragmentos ni contradicciones.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente la pregunta y cita correctamente las fuentes de la sección de personalización.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4737,
+        "tokens_salida": 303,
+        "costo_usd": 0.000625,
+        "segundos": 1.85
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que la personalización adapta recuperación y generación, y menciona ROPG, CFRAG, PGraphRAG, PersonaRAG y ERAGent. Todo aparece en los fragmentos 041 y 042 (ROPG selecciona estrategia de recuperación, CFRAG usa filtrado colaborativo con usuarios similares, PGraphRAG construye grafo centrado en el usuario, PersonaRAG adapta en tiempo real, ERAGent incorpora preferencias explícitas). Omite LAPDOG y AFCE-RAG, pero cubre bien la idea central.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "No menciona las estrategias de enriquecimiento del perfil con fuentes externas (LAPDOG) ni los perfiles de estilo de escritura (AFCE-RAG).",
+          "Es una lista de métodos con poca explicación del mecanismo general, por ejemplo el problema de arranque en frío."
+        ],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos citados y responde bien la pregunta, aunque omite algunas estrategias como el enriquecimiento de perfil y el estilo de escritura.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4737,
+        "tokens_salida": 452,
+        "costo_usd": 0.013994,
+        "segundos": 3.45
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 13",
+      "tipo": "real",
+      "pregunta": "¿Qué métricas y conjuntos de datos se usan para evaluar RAG?",
+      "respuesta": "Para evaluar RAG, se utilizan métricas como Exact Match (EM), F1, MAP, MRR, NDCG, BEM, BLEU, ROUGE, Accuracy, Precision, Recall, Hit Rate, Accuracy (QA), BLEU (Generation), ROUGE-L (Generation), and Faithfulness. Los conjuntos de datos incluyen TriviaQA, HotpotQA, FEVER, Natural Questions (NQ), Wizard of Wikipedia (WoW), T-REX, KILT, PopQA, NoMIRACL, UJ, EventKG, UJ, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, BioASQ, WikiEval, KILT, SuperGLUE, EventKG, UJ, etc.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta enumera métricas (EM, F1, MAP, MRR, NDCG, BEM, BLEU, ROUGE, Accuracy, Precision, Recall, Hit Rate, Faithfulness) y conjuntos de datos (TriviaQA, HotpotQA, FEVER, NQ, WoW, T-REX, KILT, PopQA, NoMIRACL, UJ, EventKG, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, BioASQ, WikiEval, SuperGLUE). Todos aparecen en los fragmentos, sobre todo en la sección 7 y en las tablas 2 y de frameworks de evaluación. La respuesta contesta directamente la pregunta, pero repite UJ, KILT y EventKG y mezcla inglés y español; además termina con 'etc.', lo que deja la lista abierta.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La lista repite UJ, KILT y EventKG varias veces sin necesidad.",
+          "Mezcla español e inglés en la misma frase (\"and ROUGE-L (Generation)\").",
+          "Cierra con 'etc.', lo que deja abierta una lista que los fragmentos sí delimitan."
+        ],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos y responde la pregunta, aunque con repeticiones y una redacción mixta que conviene pulir.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4973,
+        "tokens_salida": 1193,
+        "costo_usd": 0.001094,
+        "segundos": 6.24
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta enumera métricas (EM, F1, MAP, MRR, NDCG, BEM, BLEU, ROUGE, Accuracy, Precision, Recall, Hit Rate, Faithfulness) y conjuntos de datos (TriviaQA, HotpotQA, FEVER, NQ, WoW, T-REX, KILT, PopQA, NoMIRACL, EventKG, UJ, MMLU-Med, MedQA-US, MedMCQA, PubMedQA, BioASQ, WikiEval, SuperGLUE) que aparecen todos en los fragmentos citados. No inventa nada, pero la redacción es descuidada: repite elementos, mezcla inglés y español y las métricas no se asocian a ningún marco ni tarea.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Hay elementos repetidos en las listas (UJ cuatro veces, EventKG y KILT dos veces; Accuracy, BLEU y ROUGE aparecen también como Accuracy (QA), BLEU (Generation) y ROUGE-L (Generation)).",
+          "Mezcla idiomas: usa 'and' en inglés dentro de una respuesta en español.",
+          "Es una lista plana sin explicar qué métrica se usa con qué conjunto de datos o marco (RAGAS, ARES, eRAG, etc.), ni la división recuperación/generación.",
+          "Termina con 'etc.' y omite métricas como Misleading Rate, Rejection Rate o Error Detection Rate."
+        ],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel y está bien respaldada por los fragmentos citados, pero la lista es redundante, mezcla idiomas y carece de estructura.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4973,
+        "tokens_salida": 626,
+        "costo_usd": 0.016206,
+        "segundos": 4.7
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 14",
+      "tipo": "real",
+      "pregunta": "¿Cómo se comprime el contexto para que la generación sea más rápida?",
+      "respuesta": "Para acelerar la generación, se comprime el contexto mediante técnicas que reducen el número de tokens o la complejidad computacional. Esto se logra mediante métodos de selección esparsa (como Focus Mode y Sparse RAG) y métodos basados en embeddings (como xRAG y COCOM), que eliminan o reemplazan partes del texto por vectores compactos, disminuyendo significativamente las operaciones de punto flotante y mejorando la velocidad de inferencia.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que el contexto se comprime con selección esparsa (Focus Mode, Sparse RAG) y con embeddings (xRAG, COCOM), reduciendo tokens y operaciones. Estas ideas aparecen en el fragmento huang2026-rag-survey-069, que además da las cifras de 3.53x en FLOPs para xRAG y hasta 5.69x de aceleración para COCOM; la respuesta no las cita pero no las contradice. La afirmación de que se eliminan o reemplazan partes del texto por vectores compactos también está respaldada por ese fragmento.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta está respaldada por el fragmento citado sobre compresión de contexto (selección esparsa y embeddings) y responde directamente la pregunta.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4631,
+        "tokens_salida": 337,
+        "costo_usd": 0.000632,
+        "segundos": 2.0
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta resume las dos categorías del fragmento 069: selección léxica/esparsa (Focus Mode, Sparse RAG) y compresión por embeddings (xRAG, COCOM), con reducción de FLOPs y mayor velocidad de inferencia. Todo aparece en el fragmento citado. Omite LLMLingua/RECOMP y los números concretos, pero no es necesario; no hay afirmaciones sin respaldo.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel al artículo, responde directamente cómo se comprime el contexto y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4631,
+        "tokens_salida": 264,
+        "costo_usd": 0.011902,
+        "segundos": 2.6
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 15",
+      "tipo": "real",
+      "pregunta": "¿Más documentos en un contexto largo siempre mejoran la respuesta?",
+      "respuesta": "No, más documentos en un contexto largo no siempre mejoran la respuesta. A veces, el rendimiento puede disminuir debido a problemas como el sesgo posicional y la introducción de documentos irrelevantes.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que más documentos no siempre mejoran la respuesta, y que el rendimiento puede bajar por sesgo posicional y documentos irrelevantes. Ambas ideas aparecen en el fragmento 071: la curva en U invertida, los hard negatives que distraen y el fenómeno 'lost in the middle'. Las citas citadas (071 y 072) sostienen la respuesta, aunque la respuesta no las menciona en el texto, lo cual no es un problema.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente la pregunta y está bien respaldada por las citas.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4609,
+        "tokens_salida": 286,
+        "costo_usd": 0.000604,
+        "segundos": 1.92
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que más documentos no siempre mejoran el resultado y que el rendimiento puede bajar por sesgo posicional y documentos irrelevantes. Todo aparece en el fragmento 071 (curva en U invertida, hard negatives, 'lost in the middle'), reforzado por el 038. Responde directamente y es breve, aunque omite detalles como la curva en U invertida y el ejemplo de OpenScholar.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel a los fragmentos, responde directamente y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4609,
+        "tokens_salida": 253,
+        "costo_usd": 0.011748,
+        "segundos": 2.8
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 16",
+      "tipo": "real",
+      "pregunta": "What is HyDE and how does it improve retrieval?",
+      "respuesta": "HyDE is a technique that generates a pseudo-document to capture the essence of a query, enabling retrieval systems to find more relevant documents even when the query is poorly expressed or lacks sufficient context. This improves retrieval accuracy by bridging the gap between suboptimal queries and relevant documents, though it comes with a tradeoff in computational cost.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que HyDE genera un pseudo-documento que captura la esencia de la consulta, que mejora la recuperación con consultas mal formuladas y que tiene un costo computacional. Todo esto aparece en el fragmento huang2026-rag-survey-066, que además es el único citado; sin embargo, el fragmento solo menciona HyDE de pasada (dentro de la sección de negative rejection) y no explica su mecanismo en detalle, así que la respuesta es fiel pero se apoya en una descripción breve.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta sobre HyDE es fiel a los fragmentos, responde directamente la pregunta y cita correctamente el pasaje que la respalda.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4883,
+        "tokens_salida": 312,
+        "costo_usd": 0.000644,
+        "segundos": 2.24
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que HyDE genera un pseudo-documento que captura la esencia de la consulta, que permite encontrar documentos más relevantes con consultas deficientes, que mejora la precisión de recuperación y que implica un costo computacional. Todo aparece en el fragmento 066, el único citado, que sostiene la respuesta. No añade nada ajeno a los fragmentos.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel al artículo, explica directamente qué es HyDE y cómo mejora la recuperación, y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4883,
+        "tokens_salida": 253,
+        "costo_usd": 0.012296,
+        "segundos": 2.59
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 17",
+      "tipo": "real",
+      "pregunta": "How does RAPTOR organize documents for retrieval?",
+      "respuesta": "RAPTOR organizes documents into a hierarchical tree structure, where each node represents a summary of a section or subsection. Retrieval is performed recursively: an initial query matches a high-level summary, and subsequent retrieval steps focus on the detailed text chunks that compose that summary, narrowing the search space at each level.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que RAPTOR organiza los documentos en un árbol jerárquico de resúmenes y que la recuperación es recursiva, pasando de un resumen de alto nivel a los fragmentos detallados que lo componen. El fragmento 027 (citado) respalda ambas ideas: menciona que RAPTOR organiza documentos en un árbol de resúmenes y que el siguiente paso se enfoca en los fragmentos detallados del resumen. Sin embargo, la afirmación de que cada nodo representa un resumen de una sección o subsección no aparece literalmente; el fragmento habla de un árbol de resúmenes en general, aunque el ejemplo de secciones y subsecciones sí aparece como caso de jerarquía.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La frase 'cada nodo representa un resumen de una sección o subsección' va un poco más allá del texto, que solo dice que RAPTOR organiza documentos en un árbol de resúmenes."
+        ],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel y relevante: RAPTOR organiza documentos en un árbol de resúmenes y recupera de forma recursiva, respaldado por el fragmento citado, con una leve precisión excesiva sobre los nodos.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4803,
+        "tokens_salida": 483,
+        "costo_usd": 0.000722,
+        "segundos": 2.73
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "El fragmento 027 dice que RAPTOR organiza documentos en un árbol de resúmenes, que la consulta puede coincidir con un resumen de alto nivel y que luego la búsqueda se centra en los fragmentos detallados que lo componen, reduciendo el espacio de búsqueda. La respuesta reproduce esto fielmente. El único añadido es que cada nodo resume 'una sección o subsección', un matiz que el fragmento no dice de RAPTOR (menciona secciones y subsecciones como ejemplo de jerarquía general).",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que cada nodo es un resumen de una sección o subsección, detalle que el fragmento no atribuye a RAPTOR."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta describe bien el árbol de resúmenes de RAPTOR y está bien citada, salvo un detalle menor sobre secciones y subsecciones que no aparece en el fragmento.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4803,
+        "tokens_salida": 384,
+        "costo_usd": 0.013446,
+        "segundos": 3.67
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 18",
+      "tipo": "real",
+      "pregunta": "Which strategies does FILCO use to filter context?",
+      "respuesta": "FILCO uses three strategies to filter context at the sentence level: string matching, lexical overlap, and a measure of how much the context improves output likelihood using cross-mutual information. It also trains a context filtering model with these strategies to predict the most useful context at inference time.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que FILCO usa tres estrategias a nivel de oración: coincidencia de cadenas, solapamiento léxico y una medida de cuánto mejora la verosimilitud de la salida usando información mutua cruzada, y que entrena un modelo de filtrado con estas estrategias para predecir el contexto más útil en inferencia. Ambas afirmaciones aparecen textualmente en el fragmento huang2026-rag-survey-037, que está citado. La respuesta es completa y precisa respecto a la pregunta.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta sobre las estrategias de filtrado de FILCO es fiel a los fragmentos citados y responde la pregunta de forma completa.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4727,
+        "tokens_salida": 313,
+        "costo_usd": 0.000629,
+        "segundos": 2.55
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que FILCO usa tres estrategias a nivel de oración (coincidencia de cadenas, solapamiento léxico y mejora de la verosimilitud de la salida mediante información mutua cruzada) y que entrena un modelo de filtrado de contexto. Todo aparece casi textualmente en el fragmento 037, que está citado. El fragmento 036, también citado, trata de filtrado pero no menciona FILCO.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel al artículo, responde de forma completa y directa a la pregunta y se apoya en el fragmento correcto.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4727,
+        "tokens_salida": 271,
+        "costo_usd": 0.012164,
+        "segundos": 2.89
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 19",
+      "tipo": "real",
+      "pregunta": "How does the Chain-of-Verification (CoVe) method work?",
+      "respuesta": "The Chain-of-Verification (CoVe) method works by having the language model generate a draft response first, then formulate and answer questions to check its own claims against retrieved evidence before producing a final, corrected response. This iterative process allows the model to self-verify its output using feedback from the retrieval system.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que CoVe genera un borrador, formula y responde preguntas para verificar sus afirmaciones contra evidencia recuperada, y produce una respuesta final corregida. Esto aparece casi literalmente en el fragmento huang2026-rag-survey-040 (citado). La frase adicional de que el proceso usa 'feedback from the retrieval system' es una extensión razonable del 'retrieved evidence' del fragmento, aunque el texto no detalla ese mecanismo de retroalimentación.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta describe CoVe de forma fiel al fragmento citado, que lo presenta como verificación de borradores contra evidencia recuperada.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5049,
+        "tokens_salida": 306,
+        "costo_usd": 0.000658,
+        "segundos": 1.86
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La primera frase describe CoVe tal como aparece en el fragmento 040: borrador, preguntas de verificación contrastadas con evidencia recuperada y respuesta final corregida. La segunda frase añade que el proceso usa 'feedback from the retrieval system'. El fragmento habla de autoverificación contra evidencia recuperada, pero no de retroalimentación del sistema de recuperación, así que es una paráfrasis algo imprecisa. El fragmento citado sí sostiene la respuesta.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que el modelo se autoverifica 'usando retroalimentación del sistema de recuperación', cosa que el fragmento no dice; solo menciona verificar contra evidencia recuperada."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta describe correctamente el funcionamiento de CoVe y cita el fragmento adecuado, pero la última frase sobre la retroalimentación del sistema de recuperación no está respaldada por el texto.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5049,
+        "tokens_salida": 394,
+        "costo_usd": 0.014038,
+        "segundos": 3.57
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 20",
+      "tipo": "real",
+      "pregunta": "What is the SELF-ROUTE method?",
+      "respuesta": "The SELF-ROUTE method is a dynamic strategy that first attempts to answer a query using the efficient RAG approach. If the retrieved text is insufficient, it switches to processing the full long context. This combines the cost-saving benefits of RAG with the power of full-context processing.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que SELF-ROUTE es una estrategia dinámica que primero intenta responder con RAG y, si el texto recuperado no basta, pasa al contexto completo, combinando el ahorro de costo de RAG con la potencia del contexto completo. Todo ello aparece en el fragmento huang2026-rag-survey-073 (sección 8.4), que está citado. La respuesta es fiel y concisa, aunque no menciona el matiz de que el contexto completo puede ser más costoso.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta explica SELF-ROUTE con fidelidad al fragmento citado de la sección 8.4 y fue correctamente contestada.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5096,
+        "tokens_salida": 301,
+        "costo_usd": 0.00066,
+        "segundos": 1.95
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta describe SELF-ROUTE como una estrategia dinámica que intenta primero RAG y, si el texto recuperado no basta, pasa al contexto largo completo, combinando ahorro de costo y potencia. Todo esto aparece casi textualmente en el fragmento 073, que es el único citado y que sostiene la respuesta. Los demás fragmentos no mencionan el método y no era necesario citarlos.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta es fiel al artículo, explica directamente qué es SELF-ROUTE y está bien citada.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5096,
+        "tokens_salida": 257,
+        "costo_usd": 0.012762,
+        "segundos": 2.58
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 21",
+      "tipo": "real",
+      "pregunta": "¿Cuál es la capital de Francia?",
+      "respuesta": "El artículo no trata este tema, así que no puedo responderlo con base en él.",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta sobre la capital de Francia no tiene relación con el artículo, y ninguno de los fragmentos recuperados menciona Francia ni su capital. El asistente se abstuvo con el mensaje fijo, lo que corresponde a un caso sin respuesta en los fragmentos. Ningún fragmento fue citado, lo cual es correcto.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta se abstuvo correctamente, ya que el artículo no trata la capital de Francia y ningún fragmento la menciona.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4977,
+        "tokens_salida": 247,
+        "costo_usd": 0.000621,
+        "segundos": 2.19
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta sobre la capital de Francia no tiene relación con el artículo, que trata de generación aumentada por recuperación (RAG). Ninguno de los fragmentos recuperados menciona Francia ni su capital. El asistente se abstuvo y no citó nada, que es lo esperado.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "Correcto: la pregunta queda fuera del alcance del artículo y el asistente se abstuvo sin citar fuentes.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4977,
+        "tokens_salida": 218,
+        "costo_usd": 0.012134,
+        "segundos": 2.24
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 22",
+      "tipo": "real",
+      "pregunta": "¿Qué resultados obtiene GPT-7 en el benchmark MMLU según el artículo?",
+      "respuesta": "El artículo no proporciona los resultados de GPT-7 en el benchmark MMLU.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que el artículo no proporciona resultados de GPT-7 en MMLU, lo cual es una negación, no una respuesta sustantiva, y el asistente la presentó como contestación en lugar de abstención con el mensaje fijo. Los fragmentos recuperados son tablas de retrievers y generadores de trabajos de RAG (sin MMLU ni GPT-7) y no mencionan ningún benchmark de resultados, por lo que la conclusión de que no hay datos es coherente con ellos, aunque ninguno lo dice explícitamente. No se citó ningún fragmento, lo cual es correcto dado que no hay nada que citar.",
+        "fidelidad": "fiel",
+        "relevancia": 3,
+        "citas_correctas": true,
+        "abstencion_correcta": false,
+        "problemas": [
+          "El asistente debió abstenerse con el mensaje fijo y en cambio respondió con una negación que se presenta como contestación.",
+          "La respuesta no aclara que el artículo no trata MMLU ni GPT-7 en absoluto, y la formulación sugiere una respuesta factual en lugar de una abstención."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta niega los datos de GPT-7 en MMLU en vez de abstenerse con el mensaje fijo, aunque los fragmentos no contienen esa información, por lo que la decisión fue incorrecta.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5084,
+        "tokens_salida": 485,
+        "costo_usd": 0.000751,
+        "segundos": 2.89
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta dice que el artículo no da resultados de GPT-7 en MMLU. Los fragmentos recuperados solo contienen tablas de recuperadores y generadores (hasta GPT-4o-mini) y una introducción sobre ChatGPT; no mencionan GPT-7 ni MMLU. La afirmación es consistente con los fragmentos, pero no usa el mensaje fijo de abstención y se registró como 'contestó', además de que cita un fragmento que no sostiene nada relevante.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "Debió abstenerse con el mensaje fijo ('El artículo no trata este tema…'), pero la decisión quedó registrada como 'contestó'.",
+          "Citó un fragmento (tabla 4 continuación) que no aporta nada sobre GPT-7 ni MMLU; al ser una no-respuesta no debería citar nada."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta es correcta en el fondo (el artículo no trata GPT-7 ni MMLU), pero no siguió el formato de abstención y citó un fragmento irrelevante.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5084,
+        "tokens_salida": 425,
+        "costo_usd": 0.014418,
+        "segundos": 3.83
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 23",
+      "tipo": "real",
+      "pregunta": "¿Cuántos parámetros tiene el modelo que proponen los autores?",
+      "respuesta": "El artículo no trata este tema, así que no puedo responderlo con base en él.",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta asume que los autores proponen un modelo con un número de parámetros, pero el artículo es un survey sobre generación aumentada por recuperación y no presenta un modelo propio. Los fragmentos describen sistemas de terceros (FiD, REPLUG, P-RAG) y tablas comparativas, sin mencionar cuántos parámetros tiene ningún modelo. El asistente se abstuvo con el mensaje fijo, decisión correcta, y no citó fragmentos.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta se abstuvo correctamente, ya que el artículo es un survey sin modelo propio y los fragmentos no indican ningún número de parámetros.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4476,
+        "tokens_salida": 469,
+        "costo_usd": 0.000682,
+        "segundos": 2.77
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta asume que los autores proponen un modelo con cierto número de parámetros, pero se trata de una encuesta (survey) que revisa trabajos existentes. Los fragmentos recuperados (ensembles, datos de contacto, tablas comparativas) no mencionan ningún modelo propio ni su número de parámetros. La abstención es coherente con lo recuperado y no citó nada.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La abstención fue correcta: los fragmentos no incluyen ningún modelo propuesto por los autores ni su número de parámetros.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4476,
+        "tokens_salida": 253,
+        "costo_usd": 0.011482,
+        "segundos": 2.6
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 24",
+      "tipo": "real",
+      "pregunta": "¿Cómo se entrena una red neuronal convolucional para clasificar imágenes?",
+      "respuesta": "El artículo no trata este tema, así que no puedo responderlo con base en él.",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta sobre cómo entrenar una red neuronal convolucional para clasificar imágenes está fuera del alcance del artículo, que es un survey sobre generación de texto aumentada por recuperación (RAG) para LLMs. Los fragmentos recuperados hablan de indexación, re-ranking, data augmentation para re-rankers y tablas de sistemas RAG, sin mencionar CNN, clasificación de imágenes ni su entrenamiento. El asistente se abstuvo con el mensaje fijo y ninguno de los fragmentos contiene la respuesta, por lo que la abstención es correcta y no se citó nada.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La respuesta se abstuvo correctamente, ya que el artículo sobre RAG no trata el entrenamiento de redes convolucionales para clasificar imágenes y no hubo citas que sostener.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4409,
+        "tokens_salida": 365,
+        "costo_usd": 0.000623,
+        "segundos": 2.21
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta trata sobre el entrenamiento de redes neuronales convolucionales para clasificar imágenes. Los fragmentos recuperados hablan de re-ranking, indexación, estructura del artículo y tablas de recuperadores y generadores en RAG, y ninguno aborda CNN ni clasificación de imágenes. El asistente se abstuvo sin citar nada, lo cual es coherente con los fragmentos.",
+        "fidelidad": "fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [],
+        "veredicto": "aprobada",
+        "resumen": "La abstención fue correcta: el artículo trata sobre generación aumentada por recuperación y los fragmentos no contienen nada sobre entrenar CNN para clasificar imágenes.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4409,
+        "tokens_salida": 284,
+        "costo_usd": 0.011658,
+        "segundos": 2.94
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "real 25",
+      "tipo": "real",
+      "pregunta": "¿Qué opinan los autores sobre las criptomonedas?",
+      "respuesta": "Los autores no expresan una opinión personal sobre las criptomonedas en el artículo.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma que los autores no expresan una opinión sobre criptomonedas en el artículo. Los fragmentos recuperados tratan de agradecimientos, metadatos, RAG, personalización y conclusiones, y ninguno menciona criptomonedas; la afirmación negativa es coherente con ellos, aunque no se apoye en un fragmento explícito. Como el tema no aparece en los fragmentos, lo correcto era abstenerse con el mensaje fijo y no responder.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 2,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "El asistente contestó en lugar de abstenerse, aunque los fragmentos no tratan criptomonedas ni opiniones sobre ellas.",
+          "La afirmación de que los autores no expresan opinión no está respaldada por ningún fragmento; es una inferencia sin base textual.",
+          "No se usó el mensaje fijo de abstención exigido cuando el tema no está en el artículo."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "El asistente respondió a una pregunta sobre criptomonedas que el artículo no trata, cuando debió abstenerse con el mensaje fijo, por lo que la respuesta no es fiable.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 3929,
+        "tokens_salida": 451,
+        "costo_usd": 0.000618,
+        "segundos": 3.18
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta afirma que los autores no expresan opinión sobre criptomonedas. Ninguno de los fragmentos menciona el tema, así que la afirmación es una forma implícita de abstención, pero no usó el mensaje fijo de abstención y además citó fragmentos (agradecimientos, portada, conclusiones) que no respaldan nada sobre criptomonedas.",
+        "fidelidad": "fiel",
+        "relevancia": 4,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "Debió abstenerse con el mensaje fijo ('El artículo no trata este tema…') en lugar de contestar con una afirmación sobre lo que los autores no expresan.",
+          "Citó tres fragmentos (agradecimientos, portada y conclusiones) que no tienen relación con criptomonedas; al abstenerse no debía citar nada.",
+          "La afirmación de que los autores 'no expresan una opinión' es una inferencia sobre el artículo completo que los fragmentos no permiten verificar."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta debió abstenerse con el mensaje fijo porque el artículo no trata criptomonedas, y en su lugar contestó y citó fragmentos irrelevantes.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 3929,
+        "tokens_salida": 432,
+        "costo_usd": 0.012178,
+        "segundos": 3.79
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "cambiada 11←4",
+      "tipo": "cambiada",
+      "pregunta": "¿Cómo se combinan varios documentos recuperados al generar la respuesta?",
+      "respuesta": "El hashing sensible a la localidad (LSH) funciona mapeando vectores similares a valores hash cercanos o iguales, de modo que los vecinos cercanos se agrupan en el mismo bucket. Esto permite recuperar rápidamente candidatos que comparten el mismo hash, reduciendo la complejidad del problema y acelerando la búsqueda, aunque puede introducir pequeñas inexactitudes.",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta trata sobre cómo se combinan varios documentos recuperados al generar la respuesta. La respuesta del asistente habla de hashing sensible a la localidad (LSH), que no aparece en ninguno de los fragmentos recuperados; los fragmentos describen Fusion-in-Decoder, REPLUG, P-RAG y la concatenación de consulta y documentos, pero no mencionan LSH. Además, la respuesta no contesta la pregunta formulada y no cita fragmento alguno.",
+        "fidelidad": "no_fiel",
+        "relevancia": 1,
+        "citas_correctas": true,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta trata de hashing sensible a la localidad (LSH), tema que no aparece en los fragmentos recuperados.",
+          "No responde la pregunta sobre cómo se combinan varios documentos recuperados al generar la respuesta.",
+          "Debió abstenerse o responder con el contenido de los fragmentos (p. ej., FiD, REPLUG, P-RAG), que sí tratan el tema."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta habla de LSH, que no está en los fragmentos, y no responde cómo se combinan los documentos recuperados, pese a que los fragmentos sí lo explican.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4619,
+        "tokens_salida": 454,
+        "costo_usd": 0.000689,
+        "segundos": 2.58
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta es cómo se combinan varios documentos recuperados al generar la respuesta. La respuesta habla de hashing sensible a la localidad (LSH), un tema de búsqueda de vecinos que no aparece en ningún fragmento recuperado. Los fragmentos sí contenían la respuesta (FiD, REPLUG, P-RAG, concatenación en contexto), pero el asistente no la usó.",
+        "fidelidad": "no_fiel",
+        "relevancia": 1,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta trata sobre LSH, que no tiene relación con la pregunta sobre combinar documentos al generar.",
+          "Ninguna afirmación sobre LSH aparece en los fragmentos recuperados.",
+          "Ignoró los fragmentos 038 y 039, que describen FiD, REPLUG, P-RAG e In-Context RALM y respondían directamente la pregunta.",
+          "Los fragmentos citados no sostienen el contenido de la respuesta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta es sobre LSH, no sobre cómo se combinan varios documentos recuperados; no está respaldada por los fragmentos y no responde la pregunta.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4619,
+        "tokens_salida": 430,
+        "costo_usd": 0.013538,
+        "segundos": 3.62
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "cambiada 14←3",
+      "tipo": "cambiada",
+      "pregunta": "¿Cómo se comprime el contexto para que la generación sea más rápida?",
+      "respuesta": "BM25 es un retriever tradicional que se basa en coincidencias de palabras y es rápido y eficiente, ideal para dominios con terminología estandarizada. Los recuperadores basados en modelos de lenguaje, como los densos o aprendidos, capturan la semántica de las consultas y pueden encontrar documentos relevantes incluso sin coincidencias de palabras exactas, lo que mejora la precisión en consultas abiertas. La elección depende de la necesidad de velocidad y simplicidad (BM25) versus la comprensión semántica (modelos de lenguaje).",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta es sobre cómo comprimir el contexto para acelerar la generación. La respuesta habla de BM25 frente a retrievers densos, un tema de recuperación que no aparece en ninguno de los fragmentos sobre compresión de contexto. Ningún fragmento menciona BM25 ni compara retrievers por velocidad o precisión semántica, y la respuesta no cita nada. Además, debió abstenerse porque los fragmentos sí tratan la compresión (LLMLingua, RECOMP, xRAG, COCOM, REFRAG), pero la respuesta no los menciona.",
+        "fidelidad": "no_fiel",
+        "relevancia": 1,
+        "citas_correctas": true,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta trata sobre BM25 y retrievers densos, que no está en los fragmentos recuperados sobre compresión de contexto.",
+          "No responde la pregunta sobre cómo se comprime el contexto para acelerar la generación, aunque los fragmentos sí lo describen.",
+          "Se contestó cuando debió responder con la información de los fragmentos, y no hay citas que respalden la respuesta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta no es fiel a los fragmentos: habla de BM25 y retrievers densos en lugar de las técnicas de compresión de contexto que sí aparecen en el artículo.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4663,
+        "tokens_salida": 487,
+        "costo_usd": 0.00071,
+        "segundos": 3.19
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta es sobre cómo se comprime el contexto para acelerar la generación. La respuesta habla de BM25 frente a recuperadores densos, tema que no tiene relación con la pregunta y que tampoco aparece en los fragmentos recuperados. Los fragmentos sí traían la respuesta (sección 8.3: Focus Mode, Sparse RAG, LLMLingua, RECOMP, xRAG, COCOM), pero la respuesta no la usa.",
+        "fidelidad": "no_fiel",
+        "relevancia": 1,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta trata sobre BM25 y recuperadores densos, no sobre compresión de contexto.",
+          "Las afirmaciones sobre BM25 y recuperadores densos no aparecen en ninguno de los fragmentos recuperados.",
+          "Ignoró los fragmentos que sí explicaban la compresión de contexto (métodos léxicos y basados en embeddings, p. ej. xRAG, COCOM, REFRAG).",
+          "Los fragmentos citados no sostienen lo que se afirma: no se citó ninguno de los relevantes."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta no atiende la pregunta: habla de BM25 y recuperadores densos en lugar de las técnicas de compresión de contexto que sí estaban en el artículo.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4663,
+        "tokens_salida": 483,
+        "costo_usd": 0.014156,
+        "segundos": 4.14
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "cambiada 16←12",
+      "tipo": "cambiada",
+      "pregunta": "What is HyDE and how does it improve retrieval?",
+      "respuesta": "Las respuestas se personalizan adaptando tanto el proceso de recuperación como la generación a las necesidades y contexto de cada usuario. Esto incluye el uso de estrategias como ROPG [136] para seleccionar estrategias de recuperación personalizadas, CFRAG [140] para aprovechar el historial de usuarios similares y PGraphRAG [7] para construir un grafo centrado en el usuario. Además, se emplean enfoques como PersonaRAG [185] para actualizar dinámicamente el entendimiento del usuario durante una sesión, y ERAGent [142] para integrar preferencias explícitas en la generación. Estas técnicas permiten respuestas más relevantes y adaptadas a cada usuario.",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta es sobre HyDE y cómo mejora la recuperación. La respuesta, en cambio, habla de personalización de respuestas (ROPG, CFRAG, PGraphRAG, PersonaRAG, ERAGent), un tema que no aparece en los fragmentos recuperados. El fragmento huang2026-rag-survey-066 sí menciona HyDE como generación de un pseudo-documento que mejora la precisión de recuperación con costo computacional, pero la respuesta no lo recoge. Ninguna de las afirmaciones de la respuesta está respaldada por los fragmentos, y ninguna cita está marcada como citada.",
+        "fidelidad": "no_fiel",
+        "relevancia": 1,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta no trata HyDE ni cómo mejora la recuperación, aunque los fragmentos sí lo describen.",
+          "Todo el contenido sobre personalización (ROPG, CFRAG, PGraphRAG, PersonaRAG, ERAGent) no aparece en los fragmentos recuperados.",
+          "El asistente contestó cuando debía haber respondido sobre HyDE con el fragmento huang2026-rag-survey-066, o al menos no debía contestar con afirmaciones no respaldadas.",
+          "No hay citas marcadas como citado=\"sí\", por lo que no sostienen la respuesta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta es infiel: habla de personalización, que no está en los fragmentos, y omite la explicación de HyDE que sí aparece en ellos.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 5016,
+        "tokens_salida": 559,
+        "costo_usd": 0.000781,
+        "segundos": 2.92
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta es qué es HyDE y cómo mejora la recuperación. La respuesta habla de personalización (ROPG, CFRAG, PGraphRAG, PersonaRAG, ERAGent), que no aparece en los fragmentos recuperados y no tiene relación con HyDE. El fragmento 066 sí explicaba HyDE (pseudo-documento que mejora la precisión de recuperación con mayor costo computacional) pero la respuesta lo ignoró.",
+        "fidelidad": "no_fiel",
+        "relevancia": 1,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta no menciona HyDE ni su mecanismo, y trata un tema distinto (personalización).",
+          "Las afirmaciones sobre ROPG, CFRAG, PGraphRAG, PersonaRAG y ERAGent no están respaldadas por los fragmentos recuperados.",
+          "Ignoró el fragmento 066, que sí describía HyDE como generación de un pseudo-documento que mejora la precisión de recuperación a costa de cómputo.",
+          "Las citas mostradas no sostienen la respuesta a la pregunta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta no explica HyDE y contiene información sobre personalización que no sale de los fragmentos, aunque había material para responder correctamente.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 5016,
+        "tokens_salida": 470,
+        "costo_usd": 0.014732,
+        "segundos": 3.64
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "cambiada 19←2",
+      "tipo": "cambiada",
+      "pregunta": "How does the Chain-of-Verification (CoVe) method work?",
+      "respuesta": "Las fases del paradigma RAG son: pre-retrieval, retrieval, post-retrieval y generación.",
+      "claude-haiku-5-5": {
+        "analisis": "La pregunta pide cómo funciona el método Chain-of-Verification (CoVe), pero la respuesta sólo enumera las fases del paradigma RAG (pre-retrieval, retrieval, post-retrieval y generación), que no es lo preguntado. Los fragmentos sí contienen una descripción de CoVe (el modelo genera un borrador, formula y responde preguntas para verificar sus afirmaciones contra evidencia recuperada, y luego produce una respuesta corregida), pero la respuesta no la menciona. Las fases sí aparecen en el fragmento de introducción, pero no responden la pregunta.",
+        "fidelidad": "fiel",
+        "relevancia": 1,
+        "citas_correctas": true,
+        "abstencion_correcta": false,
+        "problemas": [
+          "No explica el funcionamiento de CoVe, aunque los fragmentos recuperados sí lo describen.",
+          "Responde una pregunta distinta (las fases del RAG) en lugar de la pregunta sobre CoVe.",
+          "No se abstuvo ni citó fuentes, así que no hay evidencia de citación correcta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta no contesta cómo funciona CoVe, aunque los fragmentos sí lo describen, y en su lugar da las fases del RAG, por lo que debió responder con esa descripción.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4991,
+        "tokens_salida": 468,
+        "costo_usd": 0.000733,
+        "segundos": 2.72
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La pregunta es sobre cómo funciona CoVe. El fragmento 040 describe CoVe (borrador, preguntas de verificación, respuesta final corregida), pero la respuesta no lo menciona y solo enumera las fases de RAG, lo cual aparece en el fragmento 004 pero no responde lo preguntado. Además no cita ningún fragmento.",
+        "fidelidad": "fiel",
+        "relevancia": 1,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La respuesta no explica CoVe; habla de las fases del paradigma RAG, tema distinto al preguntado.",
+          "Ignoró el fragmento 040, que sí describe el funcionamiento de CoVe.",
+          "No se citó ningún fragmento que sostenga la respuesta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta no contesta la pregunta sobre CoVe, aunque los fragmentos sí traían la explicación, y no cita ninguna fuente.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4991,
+        "tokens_salida": 346,
+        "costo_usd": 0.013442,
+        "segundos": 3.72
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "inventada 2",
+      "tipo": "inventada",
+      "pregunta": "¿Cuáles son las fases del paradigma RAG?",
+      "respuesta": "Las fases del paradigma RAG son: pre-retrieval, retrieval, post-retrieval y generación. Los autores reportan que seguir estas fases reduce las alucinaciones en un 42 % frente a GPT-4.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta afirma correctamente que el paradigma RAG tiene cuatro fases (pre-retrieval, retrieval, post-retrieval y generación), lo que aparece en el fragmento 010 y es coherente con el 004. Sin embargo, la afirmación de que seguir estas fases reduce las alucinaciones en un 42 % frente a GPT-4 no aparece en ninguno de los fragmentos recuperados, por lo que es una afirmación secundaria no respaldada. Las citas (010, 004, 014, 011, 012) sostienen la parte principal de la respuesta, pero no la cifra.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La cifra de reducción de alucinaciones del 42 % frente a GPT-4 no aparece en los fragmentos recuperados.",
+          "La respuesta no cita ninguna fuente, aunque las citas se muestran aparte y no es un problema por sí mismo."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta identifica correctamente las cuatro fases del paradigma RAG, pero incluye una cifra sobre reducción de alucinaciones que no aparece en el artículo según los fragmentos recuperados.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 3974,
+        "tokens_salida": 452,
+        "costo_usd": 0.000623,
+        "segundos": 2.4
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La primera afirmación (cuatro fases: pre-retrieval, retrieval, post-retrieval y generación) está respaldada literalmente por el fragmento 010. La segunda, que seguir estas fases reduce las alucinaciones un 42 % frente a GPT-4, no aparece en ningún fragmento y parece inventada.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que las fases reducen las alucinaciones en un 42 % frente a GPT-4, dato que no aparece en ningún fragmento recuperado.",
+          "La cifra inventada se presenta como un resultado reportado por los autores, lo que induce a error."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La lista de las cuatro fases es correcta y está bien citada, pero la respuesta añade una cifra del 42 % que no se sustenta en el artículo.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 3974,
+        "tokens_salida": 334,
+        "costo_usd": 0.011288,
+        "segundos": 2.93
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "inventada 3",
+      "tipo": "inventada",
+      "pregunta": "¿En qué se diferencian BM25 y los recuperadores basados en modelos de lenguaje?",
+      "respuesta": "BM25 es un retriever tradicional que se basa en coincidencias de palabras y es rápido y eficiente, ideal para dominios con terminología estandarizada. Los recuperadores basados en modelos de lenguaje, como los densos o aprendidos, capturan la semántica de las consultas y pueden encontrar documentos relevantes incluso sin coincidencias de palabras exactas, lo que mejora la precisión en consultas abiertas. La elección depende de la necesidad de velocidad y simplicidad (BM25) versus la comprensión semántica (modelos de lenguaje). BM25 fue propuesto por Google en 2015 y hoy lo usan todos los buscadores comerciales.",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta explica que BM25 se basa en coincidencias de palabras, es rápido y sirve para dominios con terminología estandarizada, mientras que los recuperadores neuronales o basados en modelos de lenguaje capturan semántica y encuentran documentos sin coincidencia exacta de palabras. Esto aparece en los fragmentos 050, 049 y 008. Sin embargo, la afirmación de que BM25 fue propuesto por Google en 2015 y que lo usan todos los buscadores comerciales no aparece en ningún fragmento recuperado.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La afirmación de que BM25 fue propuesto por Google en 2015 no aparece en los fragmentos recuperados.",
+          "La afirmación de que todos los buscadores comerciales usan BM25 tampoco aparece en los fragmentos recuperados."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta está bien fundamentada en el núcleo de la pregunta, pero incluye dos afirmaciones sobre Google y los buscadores comerciales que no provienen del artículo.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4460,
+        "tokens_salida": 824,
+        "costo_usd": 0.000858,
+        "segundos": 4.62
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La mayor parte de la respuesta está respaldada por los fragmentos 049, 008 y 050: BM25 se basa en términos, es rápido y sirve en dominios con terminología estándar; los modelos neuronales captan semántica y encuentran documentos sin coincidencia de palabras. La última frase (BM25 propuesto por Google en 2015 y usado por todos los buscadores comerciales) no aparece en ningún fragmento y es incorrecta. Las citas sostienen el contenido central.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que BM25 fue propuesto por Google en 2015, dato ausente en los fragmentos.",
+          "Afirma que hoy lo usan todos los buscadores comerciales, sin respaldo en los fragmentos."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La diferencia entre BM25 y los recuperadores neuronales está bien explicada y citada, pero la última frase sobre el origen y uso comercial de BM25 no figura en el artículo.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4460,
+        "tokens_salida": 391,
+        "costo_usd": 0.01283,
+        "segundos": 3.41
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "inventada 4",
+      "tipo": "inventada",
+      "pregunta": "¿Cómo funciona el hashing sensible a la localidad para buscar vecinos cercanos?",
+      "respuesta": "El hashing sensible a la localidad (LSH) funciona mapeando vectores similares a valores hash cercanos o iguales, de modo que los vecinos cercanos se agrupan en el mismo bucket. Esto permite recuperar rápidamente candidatos que comparten el mismo hash, reduciendo la complejidad del problema y acelerando la búsqueda, aunque puede introducir pequeñas inexactitudes. El artículo concluye que esta técnica hace innecesario el reordenamiento (re-ranking).",
+      "claude-haiku-5-5": {
+        "analisis": "La respuesta explica LSH como mapeo de vectores similares a hashes cercanos o iguales, con candidatos recuperados por bucket y pérdida leve de precisión, y eso sí aparece en el fragmento 017 citado. La afirmación de que el artículo concluye que esta técnica hace innecesario el reordenamiento (re-ranking) no aparece en ningún fragmento recuperado. Los fragmentos tampoco mencionan re-ranking.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "La afirmación de que el artículo concluye que LSH hace innecesario el re-ranking no está respaldada por los fragmentos recuperados."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La explicación de LSH es correcta y está bien citada, pero la conclusión sobre el re-ranking no sale de los fragmentos recuperados.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4076,
+        "tokens_salida": 643,
+        "costo_usd": 0.000729,
+        "segundos": 3.61
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La respuesta explica correctamente el mecanismo de LSH (vectores similares al mismo bucket, recuperación rápida de candidatos, reducción del problema, posibles inexactitudes), todo respaldado por el fragmento 017. Sin embargo, la última frase afirma que el artículo concluye que LSH hace innecesario el re-ranking, y eso no aparece en ningún fragmento; además, el artículo dice que LSH se usa poco en RAG y sacrifica algo de precisión.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 5,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que el artículo concluye que LSH hace innecesario el reordenamiento (re-ranking), algo que no aparece en los fragmentos y es una invención.",
+          "La afirmación inventada no se relaciona con lo que dice el fragmento citado, que solo habla de velocidad frente a pérdida de precisión."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La explicación de LSH es correcta y está bien citada, pero se añadió una conclusión sobre el re-ranking que el artículo no sostiene.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4076,
+        "tokens_salida": 409,
+        "costo_usd": 0.012242,
+        "segundos": 3.89
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    },
+    {
+      "caso": "inventada 10",
+      "tipo": "inventada",
+      "pregunta": "¿Para qué sirve filtrar los documentos recuperados?",
+      "respuesta": "Filtrar los documentos recuperados sirve para eliminar aquellos que no son relevantes o tienen baja calidad, reduciendo el tamaño del conjunto de documentos y mejorando la eficiencia y efectividad de los pasos posteriores en el sistema de generación asistida por recuperación (RAG). Según la Tabla 2, filtrar documentos requiere al menos 64 GPUs para funcionar.",
+      "claude-haiku-5-5": {
+        "analisis": "La primera parte de la respuesta (filtrar elimina documentos irrelevantes o de baja calidad, reduce el conjunto y mejora la eficiencia y efectividad de los pasos siguientes) aparece en los fragmentos 036 y 013. La segunda afirmación, que según la Tabla 2 filtrar requiere al menos 64 GPUs, no aparece en ningún fragmento recuperado y no hay ninguna tabla ni mención de GPUs entre ellos. Las citas (036, 013, 037) sí sostienen la idea principal, pero no respaldan el dato de hardware.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": false,
+        "abstencion_correcta": false,
+        "problemas": [
+          "La afirmación de que filtrar requiere al menos 64 GPUs según la Tabla 2 no aparece en los fragmentos recuperados.",
+          "Las citas mostradas no sostienen el dato de las 64 GPUs, por lo que no respaldan toda la respuesta."
+        ],
+        "veredicto": "reprobada",
+        "resumen": "La respuesta explica bien para qué sirve el filtrado, pero añade un dato sobre 64 GPUs y una Tabla 2 que no están en los fragmentos, así que no es completamente fiel.",
+        "modelo": "claude-haiku-5-5",
+        "tokens_entrada": 4255,
+        "tokens_salida": 454,
+        "costo_usd": 0.000652,
+        "segundos": 3.3
+      },
+      "claude-sonnet-5-5": {
+        "analisis": "La primera frase (eliminar documentos irrelevantes o de baja calidad, reducir el conjunto y mejorar la eficiencia y efectividad de los pasos posteriores) está respaldada por los fragmentos 036 y 013. La segunda afirma que, según la Tabla 2, filtrar requiere al menos 64 GPUs; ningún fragmento menciona esa tabla ni ese dato, así que es inventada.",
+        "fidelidad": "parcialmente_fiel",
+        "relevancia": 4,
+        "citas_correctas": true,
+        "abstencion_correcta": true,
+        "problemas": [
+          "Afirma que según la Tabla 2 el filtrado requiere al menos 64 GPUs, dato que no aparece en ningún fragmento recuperado.",
+          "La afirmación inventada se presenta con una referencia a una tabla, lo que le da una apariencia falsa de respaldo."
+        ],
+        "veredicto": "con_observaciones",
+        "resumen": "La respuesta explica bien para qué sirve filtrar, pero añade un dato inventado sobre 64 GPUs y la Tabla 2 que no está en el artículo recuperado.",
+        "modelo": "claude-sonnet-5-5",
+        "tokens_entrada": 4255,
+        "tokens_salida": 386,
+        "costo_usd": 0.01237,
+        "segundos": 3.3
+      },
+      "acerto_claude-haiku-5-5": true,
+      "acerto_claude-sonnet-5-5": true
+    }
+  ]
+}

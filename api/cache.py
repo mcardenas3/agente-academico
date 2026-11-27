@@ -19,7 +19,7 @@ from datetime import date
 from redis.asyncio import Redis
 
 from agente import MODELO_LLM, TURNOS_DE_MEMORIA, RespuestaCitada, Turno
-from auditor import Auditoria
+from auditor import MODELO_AUDITOR, Auditoria
 
 URL_REDIS = os.environ.get("URL_REDIS", "redis://127.0.0.1:6379/0")
 # Cuánto dura una respuesta en caché: un día. Si se vuelve a indexar el artículo o cambia el
@@ -58,7 +58,8 @@ async def guardar_respuesta(redis: Redis, pregunta: str, respuesta: RespuestaCit
 
 
 def _llave_auditoria(pregunta: str) -> str:
-    return llave_respuesta(pregunta).replace("respuesta:", "auditoria:", 1)
+    """Incluye el modelo auditor: si se cambia de modelo, las auditorías viejas no se reusan."""
+    return f"auditoria:{MODELO_AUDITOR}:{llave_respuesta(pregunta).removeprefix('respuesta:')}"
 
 
 async def leer_auditoria(redis: Redis, pregunta: str) -> Auditoria | None:

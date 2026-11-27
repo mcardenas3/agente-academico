@@ -338,12 +338,41 @@ un modelo de Pydantic:
   despliega con el detalle. Se guarda en la tabla `auditorias` y alimenta el panel `/admin`.
 - **Corre en la nube.** No ocupa la RAM ni la GPU de la máquina, donde ya están vLLM y Ollama.
 - **Costo.** Usa `claude-haiku-5-5` (US$0.10 por millón de tokens de entrada y US$0.50 de salida).
-  Cada auditoría cuesta unos US$0.0006, con ~4,000 tokens de entrada. Se cambia con
-  `MODELO_AUDITOR`, y el panel muestra el gasto acumulado.
+  Cada auditoría cuesta unos US$0.0007, con ~4,000 tokens de entrada. Se cambia con
+  `MODELO_AUDITOR`, y el panel muestra el gasto acumulado. Por qué Haiku y no Sonnet, medido,
+  en la tabla de abajo.
 - **No paga dos veces.** Una respuesta que sale de la caché de Redis reusa su auditoría. Además, un
   tope diario (`LIMITE_AUDITORIAS_DIA`) protege el saldo si la URL pública recibe muchas preguntas.
 - **Si falla, no estorba.** Sin llave, sin saldo o sin red, el chat funciona igual y solo dice «No
   se pudo auditar esta respuesta».
+
+### Haiku contra Sonnet (`evaluacion/comparar_auditores.py`)
+
+Los dos modelos auditaron exactamente los mismos 33 casos, con los mismos fragmentos. 25 son las
+respuestas reales de la evaluación y 8 se echaron a perder a propósito: 4 llevan la respuesta de
+otra pregunta y 4 un dato inventado al final («BM25 fue propuesto por Google en 2015…»). Los
+resultados completos están en
+[`evaluacion/comparacion_auditores.json`](evaluacion/comparacion_auditores.json).
+
+| | `claude-haiku-5-5` | `claude-sonnet-5-5` |
+|---|---|---|
+| Detecta la respuesta de otra pregunta | **4/4** | **4/4** |
+| Detecta el dato inventado | **4/4** | **4/4** |
+| Detecta las 2 abstenciones fallidas | **2/2** | **2/2** |
+| Sin falsas alarmas de abstención | **23/23** | **23/23** |
+| Respuestas reales que considera fieles | 21/25 | 18/25 |
+| Costo por auditoría | **US$0.0007** | US$0.0132 |
+| Tiempo por auditoría | **3.0 s** | 3.5 s |
+
+- **En los errores conocidos, empatan: 33/33 cada uno.** Coinciden en el veredicto de 22 de las 25
+  respuestas reales.
+- **Sonnet es más fino.** En las 3 en que no coinciden, Sonnet encontró matices que Haiku dejó
+  pasar. Por ejemplo, la respuesta dice que RQ-RAG «simplifica» la consulta, cuando el artículo
+  dice que la reescribe, descompone y aclara. O atribuye a CoVe «retroalimentación del sistema de
+  recuperación», que el fragmento no menciona. Por eso aprueba menos.
+- **Costo × desempeño: gana Haiku.** Detecta todo lo grave por 1/18 del precio. Sonnet vale la
+  pena cuando importa el detalle fino, como el reporte de la evaluación, y no en cada pregunta del
+  chat.
 
 ---
 
